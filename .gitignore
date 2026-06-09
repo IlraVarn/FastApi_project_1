@@ -1,0 +1,56 @@
+# Mac junk
+.DS_Store
+**/.DS_Store
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python junk
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+
+# Test/cache folders
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Test/cache folders
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS/editor junk
+.DS_Store
+.idea/
+.vscode/
