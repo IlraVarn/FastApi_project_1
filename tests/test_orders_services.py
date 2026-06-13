@@ -150,6 +150,8 @@ def test_list_orders_service_all_orders_success(db_session, make_db_order):
 
     returned_orders = list_orders_service(
         status=None, 
+        sort_by='created_at',
+        sort_dir='desc',
         offset=0, 
         limit=2,
         session=db_session)
@@ -167,6 +169,8 @@ def test_list_orders_service_filters_by_status_success(db_session, make_db_order
  
     returned_orders = list_orders_service(
         status='paid', 
+        sort_by='created_at',
+        sort_dir='desc',
         offset=0, 
         limit=2,
         session=db_session)
@@ -184,12 +188,35 @@ def test_list_orders_service_paginates_success(db_session, make_db_order):
 
     returned_orders = list_orders_service(
         status='paid', 
+        sort_by='created_at',
+        sort_dir='desc',
         offset=1, 
         limit=1,
         session=db_session)
     
     assert len(returned_orders) == 1
     assert returned_orders[0].id == first_order.id
+
+def test_list_orders_service_sorts_by_total_cents_success(db_session, make_db_order):
+
+    first_order = make_db_order(total_cents = 10, status = 'paid')
+
+    second_order = make_db_order(total_cents = 20, status = 'paid')
+
+    third_order = make_db_order(total_cents = 30, status = 'paid')
+
+    returned_orders = list_orders_service(
+        status='paid', 
+        sort_by='total_cents',
+        sort_dir='desc',
+        offset=0, 
+        limit=20,
+        session=db_session)
+    
+    assert len(returned_orders) == 3
+    assert returned_orders[0].id == third_order.id
+    assert returned_orders[1].id == second_order.id
+    assert returned_orders[2].id == first_order.id
 
 
 def test_list_orders_service_no_matches_returns_empty_list_success(db_session, make_db_order):
@@ -198,6 +225,8 @@ def test_list_orders_service_no_matches_returns_empty_list_success(db_session, m
 
     returned_orders = list_orders_service(
         status='pending', 
+        sort_by='created_at',
+        sort_dir='desc',
         offset=0, 
         limit=1,
         session=db_session)

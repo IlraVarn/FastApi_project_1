@@ -33,9 +33,6 @@ def to_order_detail_public(db_order: Order, db_customer: Customer) -> OrderDetai
         total_cents=db_order.total_cents, 
     )
 
-
-
-
 def to_order_detail_with_items_public(
     db_order: Order,
     db_customer: Customer,

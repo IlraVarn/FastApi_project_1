@@ -4,11 +4,12 @@ from datetime import datetime, UTC
 from typing import Literal
 
 
+
 #customers
 class Customer(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
-    email: str
+    email: str = Field(index=True, unique=True)
     internal_note: str | None = None
 
 class CustomerCreate(SQLModel):
@@ -45,11 +46,11 @@ class CustomerPublic(SQLModel):
 class Order(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime
-    customer_id: int 
+    customer_id: int = Field(foreign_key='customer.id')
     total_cents: int 
     status: str 
     
-    
+
 class OrderCreate(SQLModel):
     customer_id: int = Field(ge=1)
     total_cents: int = Field(ge=0)
@@ -93,7 +94,7 @@ class OrderDetailWithItemsPublic(SQLModel):
 #items
 class OrderItem(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    order_id: int
+    order_id: int = Field(foreign_key='order.id')
     product_name: str
     quantity: int
     unit_price_cents: int

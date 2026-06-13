@@ -70,7 +70,7 @@ def test_get_order_with_items_success(client, customer, order, item):
     assert returned_item['quantity'] == item['quantity']
 
 
-def test_list_list_orders_filter_by_status_success(client, make_order):
+def test_list_orders_filter_by_status_success(client, make_order):
     
     paid_order = make_order(total_cents = 20, status = 'paid')
     pending_order = make_order(total_cents = 10, status = 'pending')
@@ -91,6 +91,28 @@ def test_list_list_orders_filter_by_status_success(client, make_order):
     assert data[0]['customer_id'] == paid_order['customer_id']
     assert data[0]['total_cents'] == paid_order['total_cents']
     assert 'status' not in data[0]
+
+def test_list_orders_sort_by_total_cents_ascending_success(client, make_order):
+    
+    first_order = make_order(total_cents = 20, status = 'paid')
+    second_order = make_order(total_cents = 10, status = 'paid')
+    third_order = make_order(total_cents = 30, status = 'paid')
+
+    response = client.get(
+        '/orders',
+        params={
+            'sort_by': 'total_cents',
+            'sort_dir': 'asc'
+        })
+    data = response.json()
+
+    assert response.status_code == 200
+    assert len(data) == 3
+
+    assert data[0]['total_cents'] == second_order['total_cents']
+    assert data[1]['total_cents'] == first_order['total_cents']
+    assert data[2]['total_cents'] == third_order['total_cents']
+
 
 
 def test_list_orders_paginates_success(client, make_order):

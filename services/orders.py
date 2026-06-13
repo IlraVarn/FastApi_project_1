@@ -1,10 +1,22 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import desc
 from sqlmodel import Session, select, col
 
 from errors import NotFoundError, ConflictError
 from models import Customer, Order, OrderCreate, OrderItem, OrderUpdate
+from typing import Literal
+from sqlalchemy import asc, desc
+
+
+OrderSortBy = Literal["created_at", "total_cents", "id"]
+SortDirection = Literal["asc", "desc"]
+OrderStatus = Literal["paid", "pending"]
+
+ORDER_SORT_COLUMNS = {
+    "created_at": Order.created_at,
+    "total_cents": Order.total_cents,
+    "id": Order.id,
+}
 
 def create_order_service(
     order_create: OrderCreate,
@@ -68,29 +80,6 @@ def get_order_detail_with_items_service(
     return db_order, db_customer, db_items
 
 
-def list_orders_service(
-     status: str|None,
-        offset: int,
-        limit: int,
-        session: Session
-) -> list[Order]:
-    statement = select(Order)
-
-    if status is not None:
-        statement = statement.where(Order.status == status)
-
-    statement = (
-        statement
-        .order_by(desc(col(Order.created_at)), desc(col(Order.id)))
-        .offset(offset)
-        .limit(limit)
-    )
-
-    db_orders = list(session.exec(statement).all())
-
-    return db_orders
-
-
 def update_order_service(
     order_id: int,
     order_update: OrderUpdate,
@@ -135,3 +124,40 @@ def delete_order_service(
 
     session.delete(db_order)
     session.commit()
+
+def list_orders_service(
+        *,
+        session: Session,               
+        status: OrderStatus | None = None,
+        sort_by: OrderSortBy,
+        sort_dir: SortDirection,
+        offset: int,
+        limit: int,
+) -> list[Order]:
+    
+    statement = select(Order)
+
+    if status is not None:
+        statement = statement.where(Order.status == status)
+
+    sort_column = ORDER_SORT_COLUMNS[sort_by]
+
+
+    if sort_dir == "desc":
+        primary_sort = desc(sort_column)
+        tie_breaker = desc(col(Order.id))
+    else:
+        primary_sort = asc(sort_column)
+        tie_breaker = asc(col(Order.id))
+
+    if sort_by == "id":
+        statement = statement.order_by(primary_sort)
+    else:
+        statement = statement.order_by(primary_sort, tie_breaker)
+
+    statement = statement.offset(offset).limit(limit)
+
+    db_orders = list(session.exec(statement).all())
+
+    return db_orders
+

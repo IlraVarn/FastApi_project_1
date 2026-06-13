@@ -1,4 +1,5 @@
 import pytest
+import os
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
@@ -13,22 +14,45 @@ from services.items import create_item_service
 from models import CustomerCreate, OrderCreate, OrderItemCreate
 from typing import Literal
 
+from sqlalchemy import event
 
-test_engine = create_engine(
+
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
     "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
 )
+
+
+if TEST_DATABASE_URL.startswith("sqlite"):
+    test_engine = create_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(test_engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+else:
+    assert "test" in TEST_DATABASE_URL
+
+    test_engine = create_engine(
+        TEST_DATABASE_URL,
+    )
 
 
 def override_get_session():
     with Session(test_engine) as session:
         yield session
 
+
 @pytest.fixture(autouse=True)
 def reset_test_database():
     SQLModel.metadata.drop_all(test_engine)
     SQLModel.metadata.create_all(test_engine)
+
     app.dependency_overrides[get_session] = override_get_session
 
     yield
@@ -36,11 +60,19 @@ def reset_test_database():
     app.dependency_overrides.clear()
 
 
-#endpoint test fixtures
-
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture
+def db_session():
+    with Session(test_engine) as session:
+        yield session
+
+#endpoint test fixtures
+
+
 
 @pytest.fixture
 def customer(client):
@@ -101,11 +133,7 @@ def make_order(client, customer):
 
 
 #service test fixtures
-@pytest.fixture
-def db_session():
-    with Session(test_engine) as session:
-        yield session
-    
+
 
 @pytest.fixture
 def db_customer(db_session):

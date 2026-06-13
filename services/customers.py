@@ -43,3 +43,5 @@ def read_customer_service(
     if not db_customer:
         raise NotFoundError('customer not found')
     return db_customer
+
+

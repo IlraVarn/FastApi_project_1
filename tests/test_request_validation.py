@@ -104,6 +104,8 @@ def test_create_item_invalid_body_returns_422(client, payload):
         {"offset": 0, "limit": 101},
         {"offset": "abc", "limit": 10},
         {"offset": 0, "limit": "abc"},
+        {"sort_by": "customer_id"},
+        {"sort_dir": "sideways"},
     ],
 )
 
