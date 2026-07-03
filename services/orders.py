@@ -10,6 +10,7 @@ from sqlalchemy import asc, desc
 
 OrderSortBy = Literal["created_at", "total_cents", "id"]
 SortDirection = Literal["asc", "desc"]
+
 OrderStatus = Literal["paid", "pending"]
 
 ORDER_SORT_COLUMNS = {
@@ -128,7 +129,7 @@ def delete_order_service(
 def list_orders_service(
         *,
         session: Session,               
-        status: OrderStatus | None = None,
+        status: OrderStatus | None,
         sort_by: OrderSortBy,
         sort_dir: SortDirection,
         offset: int,
@@ -141,7 +142,6 @@ def list_orders_service(
         statement = statement.where(Order.status == status)
 
     sort_column = ORDER_SORT_COLUMNS[sort_by]
-
 
     if sort_dir == "desc":
         primary_sort = desc(sort_column)

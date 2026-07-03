@@ -132,6 +132,26 @@ def make_order(client, customer):
     return _make_order
 
 
+@pytest.fixture
+def make_item(client, order):
+    def _make_item(product_name: str, quantity: int, unit_price_cents: int):
+        response = client.post(
+            "/items",
+            json={
+                "order_id": order["id"],
+                "product_name": product_name,
+                "quantity": quantity,
+                "unit_price_cents": unit_price_cents,
+            },
+        )
+
+        assert response.status_code == 200
+        return response.json()
+
+    return _make_item
+
+
+
 #service test fixtures
 
 
@@ -187,3 +207,22 @@ def make_db_order(db_session, db_customer):
 
     return _make_db_order
 
+
+@pytest.fixture
+def make_db_item(db_session, db_order):
+    def _make_db_item(
+            product_name:str,
+            quantity: int,
+            unit_price_cents: int
+    ):
+        return create_item_service(
+            item=OrderItemCreate(
+                order_id=db_order.id,
+                product_name=product_name,
+                quantity=quantity,
+                unit_price_cents=unit_price_cents
+            ),
+            session=db_session
+        )
+
+    return _make_db_item

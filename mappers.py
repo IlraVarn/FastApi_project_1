@@ -55,6 +55,18 @@ def to_order_detail_with_items_public(
         items=public_items,
     )
 
+def to_order_public_list(
+        db_orders: list[Order]
+        )-> list[OrderPublic]:
+    
+    public_orders=[]
+    for db_order in db_orders:
+        public_order= to_order_public(db_order)
+        public_orders.append(public_order)
+
+    return public_orders
+
+
 #item helpers
 def to_item_public(db_item: OrderItem)-> OrderItemPublic:
     assert db_item.id is not None
@@ -68,13 +80,14 @@ def to_item_public(db_item: OrderItem)-> OrderItemPublic:
 
     )
 
-def to_order_public_list(
-        db_orders: list[Order]
-        )-> list[OrderPublic]:
-    
-    public_orders=[]
-    for db_order in db_orders:
-        public_order= to_order_public(db_order)
-        public_orders.append(public_order)
 
-    return public_orders
+def to_item_public_list(
+        db_items: list[OrderItem]
+        )-> list[OrderItemPublic]:
+    
+    public_items=[]
+    for db_item in db_items:
+        public_item= to_item_public(db_item)
+        public_items.append(public_item)
+
+    return public_items
