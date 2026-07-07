@@ -38,7 +38,7 @@ def list_items(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=50)] = 25,
     sort_by: ItemSortBy = 'product_name',
-    sort_dir: SortDirection = 'asc',
+    sort_dir: SortDirection = 'desc',
     session: Session = Depends(get_session)
 ):
 

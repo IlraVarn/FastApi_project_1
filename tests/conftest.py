@@ -72,8 +72,7 @@ def db_session():
 
 #endpoint test fixtures
 
-
-
+#CUSTOMERS
 @pytest.fixture
 def customer(client):
     response = client.post(
@@ -87,6 +86,23 @@ def customer(client):
     assert response.status_code == 200
     return response.json()
 
+
+@pytest.fixture
+def make_customer(client):
+    def _make_customer(name: str, email: str):
+        response = client.post(
+            '/customers',
+            json={
+                "name": name,
+                "email": email,
+            }
+        )
+        assert response.status_code == 200
+        return response.json()
+    
+    return _make_customer
+
+#ORDERS
 @pytest.fixture
 def order(client, customer):
     response = client.post(
@@ -98,19 +114,6 @@ def order(client, customer):
         },
     )
 
-    assert response.status_code == 200
-    return response.json()
-
-@pytest.fixture
-def item(client, order):
-    response = client.post('/items',
-         json= {
-            'order_id': order['id'],
-            'product_name': 'toy',
-            'quantity': 10,
-            'unit_price_cents': 50}
-         )
-    
     assert response.status_code == 200
     return response.json()
 
@@ -131,6 +134,20 @@ def make_order(client, customer):
 
     return _make_order
 
+
+#ITEMS
+@pytest.fixture
+def item(client, order):
+    response = client.post('/items',
+         json= {
+            'order_id': order['id'],
+            'product_name': 'toy',
+            'quantity': 10,
+            'unit_price_cents': 50}
+         )
+    
+    assert response.status_code == 200
+    return response.json()
 
 @pytest.fixture
 def make_item(client, order):
@@ -165,6 +182,19 @@ def db_customer(db_session):
         session=db_session,
     )
 
+@pytest.fixture
+def make_db_customer(db_session):
+    def _make_db_customer(name: str, email: str):
+        
+        return create_customer_service(
+            customer_create=CustomerCreate(
+                name=name,
+                email=email
+            ),
+            session=db_session
+        )
+    
+    return _make_db_customer
 
 @pytest.fixture
 def db_order(db_session, db_customer):
@@ -173,19 +203,6 @@ def db_order(db_session, db_customer):
             customer_id=db_customer.id,
             total_cents=10,
             status="paid",
-        ),
-        session=db_session,
-    )
-
-
-@pytest.fixture
-def db_item(db_session, db_order):
-    return create_item_service(
-        item=OrderItemCreate(
-            order_id=db_order.id,
-            product_name="toy",
-            quantity=10,
-            unit_price_cents=50,
         ),
         session=db_session,
     )
@@ -209,6 +226,18 @@ def make_db_order(db_session, db_customer):
 
 
 @pytest.fixture
+def db_item(db_session, db_order):
+    return create_item_service(
+        item=OrderItemCreate(
+            order_id=db_order.id,
+            product_name="toy",
+            quantity=10,
+            unit_price_cents=50,
+        ),
+        session=db_session,
+    )
+
+@pytest.fixture
 def make_db_item(db_session, db_order):
     def _make_db_item(
             product_name:str,
@@ -218,6 +247,28 @@ def make_db_item(db_session, db_order):
         return create_item_service(
             item=OrderItemCreate(
                 order_id=db_order.id,
+                product_name=product_name,
+                quantity=quantity,
+                unit_price_cents=unit_price_cents
+            ),
+            session=db_session
+        )
+
+    return _make_db_item
+
+
+@pytest.fixture
+def make_db_item_for_order(db_session, db_order):
+    def _make_db_item(
+            *,
+            order_id: int,
+            product_name:str,
+            quantity: int,
+            unit_price_cents: int
+    ):
+        return create_item_service(
+            item=OrderItemCreate(
+                order_id=order_id,
                 product_name=product_name,
                 quantity=quantity,
                 unit_price_cents=unit_price_cents

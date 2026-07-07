@@ -1,6 +1,7 @@
 from models import (Customer, CustomerPublic, 
                     Order, OrderPublic, OrderDetailPublic,
                     OrderItem, OrderItemPublic, OrderDetailWithItemsPublic)
+from sqlmodel import col
 
 #customer helpers
 def to_customer_public(db_customer: Customer)-> CustomerPublic:
@@ -11,6 +12,16 @@ def to_customer_public(db_customer: Customer)-> CustomerPublic:
         name= db_customer.name,
         email=db_customer.email
     )
+
+def to_customer_public_list(db_customers: list[Customer]
+                            )-> list[CustomerPublic]:
+    public_customers = []
+    for db_customer in db_customers:
+        public_customer = to_customer_public(db_customer)
+        public_customers.append(public_customer)
+
+    return public_customers
+
 
 #order helpers
 def to_order_public(db_order: Order) -> OrderPublic:
@@ -77,7 +88,6 @@ def to_item_public(db_item: OrderItem)-> OrderItemPublic:
         product_name=db_item.product_name,
         quantity=db_item.quantity,
         unit_price_cents=db_item.unit_price_cents
-
     )
 
 
@@ -91,3 +101,5 @@ def to_item_public_list(
         public_items.append(public_item)
 
     return public_items
+
+

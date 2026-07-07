@@ -5,12 +5,12 @@ from typing import Literal
 
 
 
-#customers
 class Customer(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
     email: str = Field(index=True, unique=True)
     internal_note: str | None = None
+
 
 class CustomerCreate(SQLModel):
     name: str = Field(min_length=1)
@@ -36,20 +36,20 @@ class CustomerCreate(SQLModel):
 
         return value
 
-#Response models: Customers
+
 class CustomerPublic(SQLModel):
     id: int
     name: str
     email: str
 
-#orders
+
+
 class Order(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime
     customer_id: int = Field(foreign_key='customer.id')
     total_cents: int 
     status: str 
-    
 
 class OrderCreate(SQLModel):
     customer_id: int = Field(ge=1)
@@ -68,8 +68,6 @@ class OrderCreate(SQLModel):
 class OrderUpdate(SQLModel):
     total_cents: int = Field(ge=0)
     status: Literal['paid', 'pending']
-
-#Response models: Orders
 
 class OrderPublic(SQLModel):
     id: int
