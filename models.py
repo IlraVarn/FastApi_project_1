@@ -2,14 +2,22 @@ from sqlmodel import Field, SQLModel
 from pydantic import field_validator
 from datetime import datetime, UTC
 from typing import Literal
+from sqlalchemy import CheckConstraint
 
 
 
 class Customer(SQLModel, table=True):
+    __table_args__ = (
+        CheckConstraint("length(name) > 0", name="ck_customer_name_non_empty"),
+        CheckConstraint("length(email) > 0", name="ck_customer_email_non_empty"),
+        )
+    
     id: int | None = Field(default=None, primary_key=True)
     name: str
     email: str = Field(index=True, unique=True)
     internal_note: str | None = None
+
+    
 
 
 class CustomerCreate(SQLModel):
@@ -91,11 +99,17 @@ class OrderDetailWithItemsPublic(SQLModel):
 
 #items
 class OrderItem(SQLModel, table=True):
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
+        CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),
+    )
+
     id: int | None = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key='order.id')
+    order_id: int = Field(foreign_key="order.id")
     product_name: str
     quantity: int
     unit_price_cents: int
+
 
 class OrderItemCreate(SQLModel):
     order_id: int = Field(ge=1)

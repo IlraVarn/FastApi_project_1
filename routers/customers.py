@@ -15,29 +15,35 @@ from services.customers import (
     SortDirection
 )
                             
-from errors import NotFoundError, ConflictError
+
+from errors import DuplicateCustomerEmailError, CustomerNotFoundError
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
 
 
-@router.post("", response_model=CustomerPublic)
+
+@router.post("", response_model=CustomerPublic, status_code=201)
 def create_customer(
-    customer: CustomerCreate, 
-    session: Session = Depends(get_session)):
+    customer_create: CustomerCreate,
+    session: Session = Depends(get_session),
+):
+    try:
+        db_customer = create_customer_service(
+            name=customer_create.name,
+            email=customer_create.email,
+            session=session,
+        )
+    except DuplicateCustomerEmailError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=error.detail,
+        )
 
-        try:
-             db_customer = create_customer_service(
-                 customer_create=customer, 
-                 session = session,)
-             
-        except ConflictError as error:
-            raise HTTPException(status_code=409, detail=error.detail)
-
-        return to_customer_public(db_customer)
+    return to_customer_public(db_customer)
 
 
-@router.get("/{customer_id}", response_model=CustomerPublic)
+@router.get("/{customer_id}", response_model=CustomerPublic, status_code=200)
 def read_customer(
     customer_id: int,
     session: Session = Depends(get_session),
@@ -48,7 +54,7 @@ def read_customer(
              customer_id=customer_id,
              session=session)
         
-    except NotFoundError as error:
+    except CustomerNotFoundError as error:
          raise HTTPException(status_code=404, detail=error.detail)
     
     return to_customer_public(db_customer)

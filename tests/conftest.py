@@ -83,7 +83,7 @@ def customer(client):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     return response.json()
 
 
@@ -97,7 +97,7 @@ def make_customer(client):
                 "email": email,
             }
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
         return response.json()
     
     return _make_customer
@@ -175,11 +175,9 @@ def make_item(client, order):
 @pytest.fixture
 def db_customer(db_session):
     return create_customer_service(
-        customer_create=CustomerCreate(
             name="Olga",
             email="x.com",
-        ),
-        session=db_session,
+            session=db_session,
     )
 
 @pytest.fixture
@@ -187,10 +185,8 @@ def make_db_customer(db_session):
     def _make_db_customer(name: str, email: str):
         
         return create_customer_service(
-            customer_create=CustomerCreate(
-                name=name,
-                email=email
-            ),
+            name=name,
+            email=email,
             session=db_session
         )
     

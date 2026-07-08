@@ -1,12 +1,19 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import desc, asc
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 
-from errors import NotFoundError, ConflictError
+from errors import (DuplicateCustomerEmailError, 
+                    CustomerNotFoundError, 
+                    DataIntegrityError)
+
 from models import (Customer, CustomerCreate,
                     Order, OrderCreate, 
                     OrderItem, OrderUpdate)
+from storage.customers import (get_customer_by_email, 
+                               get_customer_by_id,
+                               add_customer_record)
 from typing import Literal
 
 CustomerSortBy = Literal["id", "name", "email"]
@@ -18,29 +25,39 @@ CUSTOMER_SORT_COLUMNS = {
         'id': col(Customer.id)
     }
 
+
+
 def create_customer_service(
-        customer_create: CustomerCreate, 
-        session: Session
-    ) -> Customer:
+    *,
+    name: str,
+    email: str,
+    session: Session,
+) -> Customer:
     
-    statement = (select(Customer)
-                 .where(Customer.email == customer_create.email))
-    
-    existing_customer = session.exec(statement).first()
-
-    if existing_customer:
-        raise ConflictError("customer email already exists")
-
-    db_customer = Customer(
-        name= customer_create.name,
-        email= customer_create.email, 
-        internal_note= None
+    existing_customer = get_customer_by_email(
+        email=email,
+        session=session,
     )
-    session.add(db_customer)
-    session.commit()
+
+    if existing_customer is not None:
+        raise DuplicateCustomerEmailError()
+
+    db_customer = add_customer_record(
+        name=name,
+        email=email,
+        session=session,
+    )
+
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
     session.refresh(db_customer)
 
     return db_customer
+
 
 
 def read_customer_service(
@@ -48,9 +65,12 @@ def read_customer_service(
     session: Session ,
 ) -> Customer:
     
-    db_customer = session.get(Customer, customer_id)
-    if not db_customer:
-        raise NotFoundError('customer not found')
+    db_customer = get_customer_by_id(
+        customer_id=customer_id,
+        session=session)
+    
+    if db_customer is None:
+        raise CustomerNotFoundError('customer not found')
     return db_customer
 
 

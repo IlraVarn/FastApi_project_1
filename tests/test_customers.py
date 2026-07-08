@@ -14,7 +14,7 @@ def test_create_customer_success(client):
     #transform json to python dict
     data = response.json()
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     
     assert data["id"] is not None
     assert data["name"] == "Ana"

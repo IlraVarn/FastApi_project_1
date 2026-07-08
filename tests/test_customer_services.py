@@ -1,26 +1,24 @@
 import pytest 
-from errors import ConflictError, NotFoundError
+from errors import DuplicateCustomerEmailError, CustomerNotFoundError
 from models import CustomerCreate
 from services.customers import (create_customer_service,
                                 read_customer_service,
-                                list_customers_service)
+                                list_customers_service,)
+
 
 #SUCCESS TESTS
 
 def test_create_customer_service_success(db_session):
-    customer_create = CustomerCreate(
-        name="Olga",
-        email="x.com",
-    )
 
     db_customer = create_customer_service(
-        customer_create=customer_create,
+        name="Olga",
+        email="x.com",
         session=db_session,
     )
 
     assert db_customer.id is not None
-    assert db_customer.name == customer_create.name
-    assert db_customer.email == customer_create.email
+    assert db_customer.name == 'Olga'
+    assert db_customer.email == 'x.com'
     assert db_customer.internal_note is None
 
 def test_read_customer_service_success(db_session, db_customer):
@@ -132,21 +130,18 @@ def test_list_customers_no_matches_returns_empty_list_success(db_session, make_d
 #FAILURE TESTS
 def test_create_customer_service_duplicate_email(db_session, db_customer):
 
-    duplicate_customer = CustomerCreate(
-        name="Olga 2",
-        email=db_customer.email
-    )
 
-    with pytest.raises(ConflictError) as captured_error:
+    with pytest.raises(DuplicateCustomerEmailError) as captured_error:
         create_customer_service(
-            customer_create=duplicate_customer,
+            name='Olga',
+            email=db_customer.email,
             session=db_session,
         )
 
     assert captured_error.value.detail == "customer email already exists"
 
 def test_read_customer_service_customer_not_found(db_session):
-    with pytest.raises(NotFoundError) as captured_error:
+    with pytest.raises(CustomerNotFoundError) as captured_error:
         read_customer_service(
             customer_id=999,
             session=db_session,
