@@ -5,18 +5,20 @@ from typing import Annotated
 
 
 from db import get_session
-from models import CustomerPublic, Customer, CustomerCreate
+from models import (CustomerPublic, Customer, CustomerCreate,
+                   CustomerSortDirection, CustomerSortBy)
+
 from mappers import to_customer_public, to_customer_public_list
 from services.customers import (
     create_customer_service, 
     read_customer_service,
     list_customers_service,
-    CustomerSortBy,
-    SortDirection
 )
                             
 
-from errors import DuplicateCustomerEmailError, CustomerNotFoundError
+from errors import (DuplicateCustomerEmailError, 
+                    CustomerNotFoundError,
+                    DataIntegrityError)
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -38,8 +40,14 @@ def create_customer(
         raise HTTPException(
             status_code=409,
             detail=error.detail,
-        )
-
+        ) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, 
+                            detail='internal server error'
+                            ) from error
+    
+    
     return to_customer_public(db_customer)
 
 
@@ -55,7 +63,9 @@ def read_customer(
              session=session)
         
     except CustomerNotFoundError as error:
-         raise HTTPException(status_code=404, detail=error.detail)
+         raise HTTPException(status_code=404, 
+                             detail=error.detail
+                             ) from error
     
     return to_customer_public(db_customer)
 
@@ -65,7 +75,7 @@ def list_customers(*,
     name: Annotated[str | None, Query(min_length=1)] = None,
     email: Annotated[str | None, Query(min_length=1)] = None,
     sort_by: CustomerSortBy = 'name',
-    sort_dir: SortDirection = 'desc',
+    sort_dir: CustomerSortDirection = 'desc',
     offset: Annotated[int, Query(ge = 0)] = 0,
     limit: Annotated[int, Query(ge=0)] = 25,
     session: Session = Depends(get_session)

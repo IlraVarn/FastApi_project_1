@@ -1,17 +1,15 @@
 from datetime import UTC, datetime
-
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 
-from errors import NotFoundError, ConflictError
-from models import Customer, Order, OrderCreate, OrderItem, OrderUpdate
+from errors import NotFoundError, ConflictError, CustomerNotFoundError, OrderNotFoundError, DataIntegrityError
+from models import (Customer, Order, OrderCreate, OrderItem, OrderUpdate, 
+                    OrderSortDirection, OrderSortBy, OrderStatus)
 from typing import Literal
 from sqlalchemy import asc, desc
+from storage.customers import get_customer_by_id
+from storage.orders import add_order_record
 
-
-OrderSortBy = Literal["created_at", "total_cents", "id"]
-SortDirection = Literal["asc", "desc"]
-
-OrderStatus = Literal["paid", "pending"]
 
 ORDER_SORT_COLUMNS = {
     "created_at": Order.created_at,
@@ -20,24 +18,32 @@ ORDER_SORT_COLUMNS = {
 }
 
 def create_order_service(
-    order_create: OrderCreate,
+    customer_id: int,
+    total_cents: int,
+    status: str,
     session: Session,
 ) -> Order:
     
-    db_customer = session.get(Customer, order_create.customer_id)
+    db_customer = get_customer_by_id(customer_id=customer_id, 
+                                     session=session)
 
-    if not db_customer:
-        raise NotFoundError("customer not found")
+    if db_customer is None:
+        raise CustomerNotFoundError()
 
-    db_order = Order(
-        created_at=datetime.now(UTC),
-        customer_id=order_create.customer_id,
-        total_cents=order_create.total_cents,
-        status=order_create.status,
-    )
+    db_order = add_order_record(
+        customer_id=customer_id,
+        total_cents=total_cents,
+        status=status,
+        session=session,
+        )
+    
+    try:
+        session.commit()
 
-    session.add(db_order)
-    session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+    
     session.refresh(db_order)
 
     return db_order
@@ -131,7 +137,7 @@ def list_orders_service(
         session: Session,               
         status: OrderStatus | None,
         sort_by: OrderSortBy,
-        sort_dir: SortDirection,
+        sort_dir: OrderSortDirection,
         offset: int,
         limit: int,
 ) -> list[Order]:

@@ -7,7 +7,7 @@ class AppError(Exception):
         self.detail = detail or self.default_detail
         super().__init__(self.detail)
 
-class DataIntegrityError(Exception):
+class DataIntegrityError(AppError):
     default_detail = "database integrity error"
 
 
@@ -17,6 +17,12 @@ class DuplicateCustomerEmailError(AppError):
 
 class CustomerNotFoundError(AppError):
     default_detail = "customer not found"
+
+class OrderNotFoundError(AppError):
+    default_detail = "order not found"
+
+
+
 
 
 class NotFoundError(Exception):
@@ -28,3 +34,5 @@ class ConflictError(Exception):
     def __init__(self, detail: str):
         super().__init__(detail)
         self.detail = detail
+
+

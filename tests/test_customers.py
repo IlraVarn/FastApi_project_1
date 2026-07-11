@@ -122,8 +122,8 @@ def test_create_customer_duplicate_email_returns_409(client, customer):
     response = client.post(
         "/customers",
         json={
-            "name": "Ana",
-            "email": "x.com",
+            "name": "O",
+            "email": "olga@x.com",
         },
     )
 
@@ -131,6 +131,21 @@ def test_create_customer_duplicate_email_returns_409(client, customer):
 
     assert response.status_code == 409
     assert data == {'detail': 'customer email already exists'}
+
+def test_create_customer_invalid_email_returns_422(client, customer):
+    
+    response = client.post(
+        "/customers",
+        json={
+            "name": "O",
+            "email": "@x.com",
+        },
+    )
+
+    data = response.json()
+
+    assert response.status_code == 422
+    assert 'detail' in data
  
 def test_get_customer_missing_returns_404(client):
     

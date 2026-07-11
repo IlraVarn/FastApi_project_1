@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from db import get_session
-from errors import NotFoundError, ConflictError
+from errors import NotFoundError, ConflictError, OrderNotFoundError, CustomerNotFoundError
 from mappers import (
     to_order_public,
     to_order_detail_public,
@@ -17,7 +17,8 @@ from models import (
     OrderDetailPublic,
     OrderDetailWithItemsPublic,
     OrderUpdate,
-)
+     OrderSortBy, OrderSortDirection, OrderStatus)
+
 from services.orders import (
     create_order_service,
     get_order_detail_service,
@@ -25,10 +26,6 @@ from services.orders import (
     list_orders_service,
     update_order_service,
     delete_order_service,
-    OrderSortBy,
-    OrderStatus, 
-    SortDirection
-    
 )
 
 
@@ -40,13 +37,18 @@ def create_order(
     order: OrderCreate,
     session: Session = Depends(get_session),
 ):
+
     try:
         db_order = create_order_service(
-            order_create=order,
+            customer_id=order.customer_id,
+            total_cents=order.total_cents,
+            status=order.status,
             session=session,
         )
-    except NotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
+    except CustomerNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error 
 
     return to_order_public(db_order)
 
@@ -132,7 +134,7 @@ def list_orders(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     session: Session = Depends(get_session),
     sort_by: OrderSortBy = 'created_at',
-    sort_dir: SortDirection = 'desc'
+    sort_dir: OrderSortDirection = 'desc'
 ):
     db_orders = list_orders_service(
         status=status,

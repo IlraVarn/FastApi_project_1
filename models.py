@@ -1,28 +1,26 @@
 from sqlmodel import Field, SQLModel
-from pydantic import field_validator
+from pydantic import field_validator, EmailStr
 from datetime import datetime, UTC
 from typing import Literal
 from sqlalchemy import CheckConstraint
 
 
-
+#CUSTOMERS
 class Customer(SQLModel, table=True):
     __table_args__ = (
-        CheckConstraint("length(name) > 0", name="ck_customer_name_non_empty"),
-        CheckConstraint("length(email) > 0", name="ck_customer_email_non_empty"),
+        CheckConstraint("length(trim(name)) > 0", name="ck_customer_name_non_empty"),
+        CheckConstraint("length(trim(email)) > 0", name="ck_customer_email_non_empty"),
         )
     
     id: int | None = Field(default=None, primary_key=True)
-    name: str
-    email: str = Field(index=True, unique=True)
+    name: str = Field(nullable=False)
+    email: str = Field(nullable=False, index=True, unique=True)
     internal_note: str | None = None
 
     
-
-
 class CustomerCreate(SQLModel):
     name: str = Field(min_length=1)
-    email: str = Field(min_length=1)
+    email: EmailStr
 
     @field_validator("name")
     @classmethod
@@ -36,11 +34,8 @@ class CustomerCreate(SQLModel):
     
     @field_validator("email")
     @classmethod
-    def strip_lower_and_reject_blank(cls, value: str) -> str:
+    def strip_lower(cls, value: str) -> str:
         value = value.strip().lower()
-
-        if not value:
-            raise ValueError("must not be blank")
 
         return value
 
@@ -52,6 +47,7 @@ class CustomerPublic(SQLModel):
 
 
 
+#ORDERS
 class Order(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime
@@ -77,12 +73,14 @@ class OrderUpdate(SQLModel):
     total_cents: int = Field(ge=0)
     status: Literal['paid', 'pending']
 
+
 class OrderPublic(SQLModel):
     id: int
     created_at: datetime
     customer_id: int
     total_cents: int
     
+
 class OrderDetailPublic(SQLModel):
     id: int
     created_at: datetime
@@ -97,7 +95,9 @@ class OrderDetailWithItemsPublic(SQLModel):
     total_cents: int
     items: list[OrderItemPublic]
 
-#items
+
+
+#ITEMS
 class OrderItem(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
@@ -127,7 +127,7 @@ class OrderItemCreate(SQLModel):
 
         return value
 
-#Response models: Items
+
 class OrderItemPublic(SQLModel):
     id: int
     order_id: int
@@ -137,8 +137,12 @@ class OrderItemPublic(SQLModel):
 
 
 
+#customers
+CustomerSortBy = Literal["id", "name", "email"]
+CustomerSortDirection = Literal["asc", "desc"]
 
 
-
-
-
+#orders
+OrderSortBy = Literal["created_at", "total_cents", "id"]
+OrderSortDirection = Literal["asc", "desc"]
+OrderStatus = Literal["paid", "pending"]

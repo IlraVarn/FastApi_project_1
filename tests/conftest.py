@@ -79,7 +79,7 @@ def customer(client):
         "/customers",
         json={
             "name": "Olga",
-            "email": "x.com",
+            "email": "olga@x.com",
         },
     )
 
@@ -176,7 +176,7 @@ def make_item(client, order):
 def db_customer(db_session):
     return create_customer_service(
             name="Olga",
-            email="x.com",
+            email="olga@x.com",
             session=db_session,
     )
 
