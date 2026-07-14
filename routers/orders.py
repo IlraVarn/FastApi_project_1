@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from db import get_session
-from errors import NotFoundError, ConflictError, OrderNotFoundError, CustomerNotFoundError
+from errors import (ConflictError, 
+                    OrderNotFoundError, CustomerNotFoundError, DataIntegrityError)
 from mappers import (
     to_order_public,
     to_order_detail_public,
@@ -32,7 +33,7 @@ from services.orders import (
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-@router.post("", response_model=OrderPublic)
+@router.post("", response_model=OrderPublic, status_code=201)
 def create_order(
     order: OrderCreate,
     session: Session = Depends(get_session),
@@ -47,9 +48,12 @@ def create_order(
         )
     except CustomerNotFoundError as error:
         raise HTTPException(status_code=404, detail=error.detail) from error
-    except OrderNotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail) from error 
 
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, 
+                            detail='internal server error'
+                            ) from error
+    
     return to_order_public(db_order)
 
 
@@ -59,13 +63,18 @@ def read_order(
     order_id: int,
     session: Session = Depends(get_session),
     ):
+
     try:
         db_order, db_customer = get_order_detail_service(
             order_id=order_id,
             session=session,
         )
-    except NotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
+
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, detail='internal server error') from error
 
     return to_order_detail_public(db_order, db_customer)
 
@@ -80,8 +89,12 @@ def read_order_with_items(
             order_id=order_id,
             session=session,
         )
-    except NotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
+
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, detail='internal server error') from error
 
     return to_order_detail_with_items_public(
         db_order=db_order,
@@ -99,11 +112,15 @@ def update_order(
     try:
         db_order, db_customer = update_order_service(
             order_id=order_id,
-            order_update=order,
+            total_cents=order.total_cents,
+            status=order.status,
             session=session,
         )
-    except NotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, detail='internal server error') from error
 
     return to_order_detail_public(db_order, db_customer)
 
@@ -118,11 +135,14 @@ def delete_order(
             order_id=order_id,
             session=session,
         )
-    except NotFoundError as error:
+    except OrderNotFoundError as error:
         raise HTTPException(status_code=404, detail=error.detail)
     
     except ConflictError as error:
         raise HTTPException(status_code=409, detail=error.detail)
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, detail='internal server error') from error
 
     return {"ok": True}
 

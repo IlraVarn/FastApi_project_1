@@ -114,7 +114,7 @@ def order(client, customer):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     return response.json()
 
 @pytest.fixture
@@ -129,7 +129,7 @@ def make_order(client, customer):
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         return response.json()
 
     return _make_order
@@ -146,7 +146,7 @@ def item(client, order):
             'unit_price_cents': 50}
          )
     
-    assert response.status_code == 200
+    assert response.status_code == 201
     return response.json()
 
 @pytest.fixture
@@ -162,7 +162,7 @@ def make_item(client, order):
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         return response.json()
 
     return _make_item
@@ -195,11 +195,9 @@ def make_db_customer(db_session):
 @pytest.fixture
 def db_order(db_session, db_customer):
     return create_order_service(
-        order_create=OrderCreate(
             customer_id=db_customer.id,
             total_cents=10,
             status="paid",
-        ),
         session=db_session,
     )
 
@@ -210,11 +208,9 @@ def make_db_order(db_session, db_customer):
         status: Literal['paid', 'pending'],
     ):
         return create_order_service(
-            order_create=OrderCreate(
                 customer_id=db_customer.id,
                 total_cents=total_cents,
                 status=status,
-            ),
             session=db_session,
         )
 
@@ -224,12 +220,10 @@ def make_db_order(db_session, db_customer):
 @pytest.fixture
 def db_item(db_session, db_order):
     return create_item_service(
-        item=OrderItemCreate(
             order_id=db_order.id,
             product_name="toy",
             quantity=10,
             unit_price_cents=50,
-        ),
         session=db_session,
     )
 
@@ -241,13 +235,11 @@ def make_db_item(db_session, db_order):
             unit_price_cents: int
     ):
         return create_item_service(
-            item=OrderItemCreate(
                 order_id=db_order.id,
                 product_name=product_name,
                 quantity=quantity,
-                unit_price_cents=unit_price_cents
-            ),
-            session=db_session
+                unit_price_cents=unit_price_cents,
+                session=db_session
         )
 
     return _make_db_item
@@ -263,13 +255,11 @@ def make_db_item_for_order(db_session, db_order):
             unit_price_cents: int
     ):
         return create_item_service(
-            item=OrderItemCreate(
                 order_id=order_id,
                 product_name=product_name,
                 quantity=quantity,
-                unit_price_cents=unit_price_cents
-            ),
-            session=db_session
+                unit_price_cents=unit_price_cents,
+                session=db_session
         )
 
     return _make_db_item

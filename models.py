@@ -49,11 +49,17 @@ class CustomerPublic(SQLModel):
 
 #ORDERS
 class Order(SQLModel, table=True):
+    __table_args__ = (
+        CheckConstraint("customer_id > 0", name="ck_customer_id_positive"),
+        CheckConstraint("total_cents > 0", name="ck_total_cents_non_negative"),
+        CheckConstraint("status IN ('paid', 'pending')", name="ck_order_status_valid"),
+        )
+    
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime
-    customer_id: int = Field(foreign_key='customer.id')
-    total_cents: int 
-    status: str 
+    created_at: datetime = Field(nullable=False)
+    customer_id: int = Field(nullable=False, foreign_key='customer.id')
+    total_cents: int = Field(nullable=False)
+    status: str = Field(nullable=False)
 
 class OrderCreate(SQLModel):
     customer_id: int = Field(ge=1)
@@ -137,12 +143,34 @@ class OrderItemPublic(SQLModel):
 
 
 
-#customers
+#customers sort
 CustomerSortBy = Literal["id", "name", "email"]
 CustomerSortDirection = Literal["asc", "desc"]
 
 
-#orders
+#orders sort
 OrderSortBy = Literal["created_at", "total_cents", "id"]
 OrderSortDirection = Literal["asc", "desc"]
 OrderStatus = Literal["paid", "pending"]
+ORDER_SORT_COLUMNS = {
+    "created_at": Order.created_at,
+    "total_cents": Order.total_cents,
+    "id": Order.id,
+}
+
+
+#items sort
+ItemsSortDirection = Literal['asc', 'desc']
+ItemSortBy = Literal[
+                    "product_name", 
+                    "quantity",
+                    "unit_price_cents",
+                    'id'
+]
+
+ITEM_SORT_COLUNMS = {
+    "product_name": OrderItem.product_name,
+    "quanity": OrderItem.quantity,
+    "unit_price_cents": OrderItem.unit_price_cents,
+    'id': OrderItem.id
+}

@@ -10,7 +10,7 @@ def test_create_item_success(client, order):
          )
     
     data = response.json()
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert data['id'] is not None
     assert data['order_id'] == order['id']
     assert data['product_name'] == 'toy'
@@ -66,7 +66,7 @@ def test_list_items_filter_by_order_id_success(client, make_order):
                                           'quantity': 1,
                                           'unit_price_cents': 10
                                       })
-    assert first_item_response.status_code == 200
+    assert first_item_response.status_code == 201
     first_item = first_item_response.json()
 
     second_item_response = client.post('/items',
@@ -76,7 +76,7 @@ def test_list_items_filter_by_order_id_success(client, make_order):
                                           'quantity': 2,
                                           'unit_price_cents': 20
                                       })
-    assert second_item_response.status_code == 200
+    assert second_item_response.status_code == 201
     second_item = second_item_response.json()
 
     response = client.get('/items',

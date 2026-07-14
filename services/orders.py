@@ -2,20 +2,19 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 
-from errors import NotFoundError, ConflictError, CustomerNotFoundError, OrderNotFoundError, DataIntegrityError
+from errors import CustomerNotFoundError, OrderNotFoundError, DataIntegrityError, ConflictError
 from models import (Customer, Order, OrderCreate, OrderItem, OrderUpdate, 
                     OrderSortDirection, OrderSortBy, OrderStatus)
 from typing import Literal
 from sqlalchemy import asc, desc
 from storage.customers import get_customer_by_id
-from storage.orders import add_order_record
+from storage.orders import (add_order_record, 
+                            get_order_by_id, 
+                            update_order,
+                            delete_order_record,
+                            list_orders)
+from storage.items import list_items_by_order_id
 
-
-ORDER_SORT_COLUMNS = {
-    "created_at": Order.created_at,
-    "total_cents": Order.total_cents,
-    "id": Order.id,
-}
 
 def create_order_service(
     customer_id: int,
@@ -54,15 +53,18 @@ def get_order_detail_service(
     session: Session,
 ) -> tuple[Order, Customer]:
     
-    db_order = session.get(Order, order_id)
+    db_order = get_order_by_id(
+        order_id=order_id, 
+        session=session)
 
-    if not db_order:
-        raise NotFoundError("order not found")
+    if db_order is None:
+        raise OrderNotFoundError()
 
-    db_customer = session.get(Customer, db_order.customer_id)
+    db_customer = get_customer_by_id(customer_id=db_order.customer_id, 
+                                     session=session)
 
-    if not db_customer:
-        raise NotFoundError("customer not found")
+    if db_customer is None:
+        raise DataIntegrityError()
 
     return db_order, db_customer
 
@@ -71,42 +73,49 @@ def get_order_detail_with_items_service(
     order_id: int,
     session: Session,
 ) -> tuple[Order, Customer, list[OrderItem]]:
+    
     db_order, db_customer = get_order_detail_service(
         order_id=order_id,
         session=session,
     )
 
-    statement = (
-        select(OrderItem)
-        .where(OrderItem.order_id == order_id)
-        .order_by(col(OrderItem.id))
-    )
-
-    db_items = list(session.exec(statement).all())
+    db_items = list_items_by_order_id(order_id=order_id, session=session)
 
     return db_order, db_customer, db_items
 
 
 def update_order_service(
     order_id: int,
-    order_update: OrderUpdate,
+    total_cents: int,
+    status: str,
     session: Session,
 ) -> tuple[Order, Customer]:
-    db_order = session.get(Order, order_id)
+    
+    db_order = get_order_by_id(
+        order_id=order_id, 
+        session=session)
 
-    if not db_order:
-        raise NotFoundError("order not found")
+    if db_order is None:
+        raise OrderNotFoundError()
 
-    db_customer = session.get(Customer, db_order.customer_id)
+    db_customer = get_customer_by_id(customer_id=db_order.customer_id, 
+                                     session=session)
+    
+    if db_customer is None:
+        raise DataIntegrityError()
+    
+    db_order = update_order(db_order=db_order, 
+                            total_cents=total_cents, 
+                            status=status, 
+                            session=session)
 
-    if not db_customer:
-        raise NotFoundError("customer not found")
+    try:
+        session.commit()
 
-    db_order.total_cents = order_update.total_cents
-    db_order.status = order_update.status
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
 
-    session.add(db_order)
-    session.commit()
     session.refresh(db_order)
 
     return db_order, db_customer
@@ -116,21 +125,30 @@ def delete_order_service(
     order_id: int,
     session: Session,
 ) -> None:
-    db_order = session.get(Order, order_id)
-
-    if not db_order:
-        raise NotFoundError("order not found")
     
-    statement= (select(OrderItem)
-                .where(OrderItem.order_id == order_id)
-    )
-    db_items = list(session.exec(statement).all())
+    db_order = get_order_by_id(
+        order_id=order_id, 
+        session=session)
+
+    if db_order is None:
+        raise OrderNotFoundError("order not found")
+    
+
+    db_items = list_items_by_order_id(
+        order_id=order_id,
+        session=session)
+
     if db_items:
         raise ConflictError('order cannot be deleted with items')
 
+    delete_order_record(db_order=db_order, session=session)
 
-    session.delete(db_order)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
 
 def list_orders_service(
         *,
@@ -142,28 +160,15 @@ def list_orders_service(
         limit: int,
 ) -> list[Order]:
     
-    statement = select(Order)
+    db_orders = list_orders(
+        session=session,               
+        status=status,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        offset=offset,
+        limit=limit)
 
-    if status is not None:
-        statement = statement.where(Order.status == status)
-
-    sort_column = ORDER_SORT_COLUMNS[sort_by]
-
-    if sort_dir == "desc":
-        primary_sort = desc(sort_column)
-        tie_breaker = desc(col(Order.id))
-    else:
-        primary_sort = asc(sort_column)
-        tie_breaker = asc(col(Order.id))
-
-    if sort_by == "id":
-        statement = statement.order_by(primary_sort)
-    else:
-        statement = statement.order_by(primary_sort, tie_breaker)
-
-    statement = statement.offset(offset).limit(limit)
-
-    db_orders = list(session.exec(statement).all())
 
     return db_orders
+
 

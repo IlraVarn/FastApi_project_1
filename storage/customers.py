@@ -54,7 +54,7 @@ def list_customer_records(
     name: str | None,
     email: str | None,
     sort_by: CustomerSortBy,
-    sort_dir: CustomerSortDirection ,
+    sort_dir: CustomerSortDirection,
     offset: int,
     limit: int,
     session: Session

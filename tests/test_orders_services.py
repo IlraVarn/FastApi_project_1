@@ -1,5 +1,5 @@
 import pytest 
-from errors import ConflictError, NotFoundError
+from errors import ConflictError, ItemNotFoundError, OrderNotFoundError, CustomerNotFoundError
 from models import OrderCreate, CustomerCreate, OrderItemCreate, OrderUpdate, Order
 from services.customers import (create_customer_service)
 from services.orders import (create_order_service,
@@ -13,36 +13,28 @@ from services.items import create_item_service
 
 def test_create_order_service_success(db_session, db_customer):
 
-    order_create = OrderCreate(
+    db_order = create_order_service(
         customer_id= db_customer.id,
         total_cents=10,
-        status='paid'
-    )
-
-    db_order = create_order_service(
-        order_create=order_create,
+        status='paid',
         session=db_session,
     )
 
     assert db_order.id is not None
     assert db_order.created_at is not None
     assert db_order.customer_id == db_customer.id
-    assert db_order.total_cents == order_create.total_cents
-    assert db_order.status == order_create.status
+    assert db_order.total_cents == 10
+    assert db_order.status == 'paid'
 
 
 def test_create_order_service_customer_not_found(db_session):
 
-    order_create = OrderCreate(
-        customer_id= 999,
-        total_cents=10,
-        status='paid'
-    )
-
-    with pytest.raises(NotFoundError) as error:
+    with pytest.raises(CustomerNotFoundError) as error:
         create_order_service(
-        order_create=order_create,
-        session=db_session,
+            customer_id= 999,
+            total_cents=10,
+            status='paid',
+            session=db_session,
     )
         
     assert error.value.detail == 'customer not found'
@@ -69,7 +61,7 @@ def test_get_order_detail_service_success(db_session, db_customer, db_order):
 
 def test_get_order_detail_service_order_not_found(db_session):
 
-    with pytest.raises(NotFoundError) as error:
+    with pytest.raises(OrderNotFoundError) as error:
         get_order_detail_service(
         order_id=999,
         session=db_session
@@ -110,7 +102,7 @@ def test_get_order_with_items_success(
 
 def test_get_order_with_items_order_not_found(db_session):
 
-    with pytest.raises(NotFoundError) as error:
+    with pytest.raises(OrderNotFoundError) as error:
         get_order_detail_with_items_service(
         order_id=999,
         session=db_session)
@@ -239,7 +231,8 @@ def test_update_order_success(db_session, db_order):
 
     returned_order, returned_customer = update_order_service(
         order_id=db_order.id,
-        order_update=OrderUpdate(total_cents=20, status='pending'),
+        total_cents=20,
+        status='pending',
         session=db_session)
     
     assert returned_order.id == db_order.id
@@ -254,10 +247,11 @@ def test_update_order_not_found(db_session):
         total_cents=20, 
         status='pending')
 
-    with pytest.raises(NotFoundError) as error:
+    with pytest.raises(OrderNotFoundError) as error:
         update_order_service(
             order_id=999, 
-            order_update=order_update, 
+            total_cents=10,
+            status='paid',
             session=db_session)
 
     assert error.value.detail == 'order not found'
@@ -272,7 +266,7 @@ def test_delete_order_service_success(db_session, db_order):
 
 def test_delete_order_service_not_found(db_session):
 
-    with pytest.raises(NotFoundError) as error:
+    with pytest.raises(OrderNotFoundError) as error:
         delete_order_service(order_id=999, session=db_session)
     
     assert error.value.detail == 'order not found'

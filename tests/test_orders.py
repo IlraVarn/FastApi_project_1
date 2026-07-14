@@ -12,7 +12,7 @@ def test_create_order_success(client, customer,):
 
     data = response.json()
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert data["id"] is not None
     assert data["created_at"] is not None
     assert data["customer_id"] == customer['id']
@@ -92,6 +92,7 @@ def test_list_orders_filter_by_status_success(client, make_order):
     assert data[0]['total_cents'] == paid_order['total_cents']
     assert 'status' not in data[0]
 
+
 def test_list_orders_sort_by_total_cents_ascending_success(client, make_order):
     
     first_order = make_order(total_cents = 20, status = 'paid')
@@ -112,7 +113,6 @@ def test_list_orders_sort_by_total_cents_ascending_success(client, make_order):
     assert data[0]['total_cents'] == second_order['total_cents']
     assert data[1]['total_cents'] == first_order['total_cents']
     assert data[2]['total_cents'] == third_order['total_cents']
-
 
 
 def test_list_orders_paginates_success(client, make_order):

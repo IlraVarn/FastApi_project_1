@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from sqlalchemy import desc
 from datetime import datetime, UTC
 from mappers import to_item_public
-from errors import NotFoundError, ConflictError
+from errors import ItemNotFoundError, DataIntegrityError, OrderNotFoundError
 
 from db import get_session
 from models import (OrderItemPublic, OrderItemCreate)
@@ -12,21 +12,27 @@ from typing import Annotated
 from services.items import (create_item_service, 
                             list_items_service, 
                             ItemSortBy,
-                            SortDirection)
+                            ItemsSortDirection)
 
 router = APIRouter(prefix="/items", tags=["items"])
 
-@router.post("", response_model=OrderItemPublic)
+@router.post("", response_model=OrderItemPublic, status_code=201)
 def create_item(item: OrderItemCreate, session: Session = Depends(get_session)):
 
     try:
         db_item = create_item_service(
-            item=item, 
+            order_id=item.order_id,
+            product_name=item.product_name,
+            quantity=item.quantity,
+            unit_price_cents= item.unit_price_cents,
             session=session
             )
 
-    except NotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(status_code=500, detail='internal server error') from error
     
     return(to_item_public(db_item))
 
@@ -38,7 +44,7 @@ def list_items(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=50)] = 25,
     sort_by: ItemSortBy = 'product_name',
-    sort_dir: SortDirection = 'desc',
+    sort_dir: ItemsSortDirection = 'desc',
     session: Session = Depends(get_session)
 ):
 
@@ -55,4 +61,3 @@ def list_items(
     return to_item_public_list(db_items)
 
    
-
