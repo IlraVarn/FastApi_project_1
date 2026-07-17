@@ -34,8 +34,6 @@ def get_order_by_id(
     return session.get(Order, order_id)
 
 
-
-
 def update_order(
         *,
         db_order: Order,

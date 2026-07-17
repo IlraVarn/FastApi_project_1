@@ -78,7 +78,7 @@ class OrderCreate(SQLModel):
 class OrderWithItemsCreate(SQLModel):
     customer_id: int = Field(ge=1)
     status: Literal['paid', 'pending']
-    items: list[ItemsForOrderWithItemsCreate] = Field(min_length=1)
+    items: list[ItemForOrderWithItemsCreate] = Field(min_length=1)
 
 
 class OrderUpdate(SQLModel):
@@ -108,7 +108,6 @@ class OrderDetailWithItemsPublic(SQLModel):
     items: list[OrderItemPublic]
 
 
-
 #ITEMS
 class OrderItem(SQLModel, table=True):
     __table_args__ = (
@@ -117,7 +116,7 @@ class OrderItem(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="order.id")
+    order_id: int = Field(foreign_key="order.id", nullable=False)
     product_name: str = Field(nullable=False)
     quantity: int = Field(nullable=False)
     unit_price_cents: int = Field(nullable=False)
@@ -140,8 +139,7 @@ class OrderItemCreate(SQLModel):
         return value
     
 
-#MULTI WRITE
-class ItemsForOrderWithItemsCreate(SQLModel):
+class ItemForOrderWithItemsCreate(SQLModel):
     product_name: str = Field(min_length=1)
     quantity: int = Field(gt=0)
     unit_price_cents: int = Field(ge=0)
@@ -157,8 +155,6 @@ class ItemsForOrderWithItemsCreate(SQLModel):
         return value
     
 
-
-
 class OrderItemPublic(SQLModel):
     id: int
     order_id: int
@@ -167,16 +163,14 @@ class OrderItemPublic(SQLModel):
     unit_price_cents: int
 
 
+#CUSTOMERS SORT
 
-
-
-
-#customers sort
 CustomerSortBy = Literal["id", "name", "email"]
 CustomerSortDirection = Literal["asc", "desc"]
 
 
-#orders sort
+#ORDERS SORT
+
 OrderSortBy = Literal["created_at", "total_cents", "id"]
 OrderSortDirection = Literal["asc", "desc"]
 OrderStatus = Literal["paid", "pending"]
@@ -188,7 +182,8 @@ ORDER_SORT_COLUMNS = {
 }
 
 
-#items sort
+#ITEMS SORT
+
 ItemsSortDirection = Literal['asc', 'desc']
 ItemSortBy = Literal[
                     "product_name", 

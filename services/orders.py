@@ -5,7 +5,7 @@ from sqlmodel import Session, select, col
 from errors import CustomerNotFoundError, OrderNotFoundError, DataIntegrityError, ConflictError
 from models import (Customer, Order, OrderCreate, OrderItem, OrderUpdate, 
                     OrderSortDirection, OrderSortBy, OrderStatus,
-                    ItemsForOrderWithItemsCreate)
+                    ItemForOrderWithItemsCreate)
 from typing import Literal
 from sqlalchemy import asc, desc
 from storage.customers import get_customer_by_id
@@ -29,15 +29,15 @@ def create_order_service(
 
     if db_customer is None:
         raise CustomerNotFoundError()
-
-    db_order = add_order_record(
-        customer_id=customer_id,
-        total_cents=total_cents,
-        status=status,
-        session=session,
-        )
     
     try:
+        db_order = add_order_record(
+            customer_id=customer_id,
+            total_cents=total_cents,
+            status=status,
+            session=session,
+            )
+
         session.commit()
 
     except IntegrityError as error:
@@ -177,9 +177,10 @@ def create_order_with_items_service(
     *,
     customer_id: int,
     status: OrderStatus,
-    items: list[ItemsForOrderWithItemsCreate],
+    items: list[ItemForOrderWithItemsCreate],
     session: Session,
 ) -> tuple[Order, Customer, list[OrderItem]]:
+    
     db_customer = get_customer_by_id(
         customer_id=customer_id,
         session=session,

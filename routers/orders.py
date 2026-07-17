@@ -19,6 +19,7 @@ from models import (
     OrderDetailWithItemsPublic,
     OrderUpdate,
      OrderSortBy, OrderSortDirection, OrderStatus,
+     ItemForOrderWithItemsCreate, 
      OrderWithItemsCreate)
 
 from services.orders import (
@@ -35,7 +36,8 @@ from services.orders import (
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-@router.post("", response_model=OrderPublic, status_code=201)
+@router.post("", 
+             response_model=OrderPublic, status_code=201)
 def create_order(
     order: OrderCreate,
     session: Session = Depends(get_session),
@@ -59,20 +61,20 @@ def create_order(
     return to_order_public(db_order)
 
 
-@router.post(
-    "/with-items",
-    response_model=OrderDetailPublic,
+@router.post("/with-items",
+    response_model=OrderDetailWithItemsPublic,
     status_code=201,
 )
 def create_order_with_items(
-    order_data: OrderWithItemsCreate,
+    order: OrderWithItemsCreate,
     session: Session = Depends(get_session),
-) -> OrderDetailPublic:
+) -> OrderDetailWithItemsPublic:
+    
     try:
         db_order, db_customer, db_items = create_order_with_items_service(
-            customer_id=order_data.customer_id,
-            status=order_data.status,
-            items=order_data.items,
+            customer_id=order.customer_id,
+            status=order.status,
+            items=order.items,
             session=session,
         )
 
@@ -88,14 +90,15 @@ def create_order_with_items(
             detail="internal server error",
         ) from error
 
-    return to_order_detail_public(
+    return to_order_detail_with_items_public(
         db_order=db_order,
         db_customer=db_customer,
+        db_items=db_items
     )
 
 
-
-@router.get("/{order_id}", response_model=OrderDetailPublic)
+@router.get("/{order_id}", 
+            response_model=OrderDetailPublic)
 def read_order(
     order_id: int,
     session: Session = Depends(get_session),
@@ -116,7 +119,8 @@ def read_order(
     return to_order_detail_public(db_order, db_customer)
 
 
-@router.get("/{order_id}/items", response_model=OrderDetailWithItemsPublic)
+@router.get("/{order_id}/items", 
+            response_model=OrderDetailWithItemsPublic)
 def read_order_with_items(
     order_id: int,
     session: Session = Depends(get_session),
@@ -140,7 +144,8 @@ def read_order_with_items(
     )
 
 
-@router.put("/{order_id}", response_model=OrderDetailPublic)
+@router.put("/{order_id}", 
+            response_model=OrderDetailPublic)
 def update_order(
     order_id: int,
     order: OrderUpdate,
@@ -184,7 +189,8 @@ def delete_order(
     return {"ok": True}
 
 
-@router.get("", response_model=list[OrderPublic])
+@router.get("", 
+            response_model=list[OrderPublic])
 def list_orders(
     status: OrderStatus | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,

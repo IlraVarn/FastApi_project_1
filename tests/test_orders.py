@@ -1,5 +1,5 @@
 #success tests
-def test_create_order_success(client, customer,):
+def test_create_order_success_returns_201(client, customer,):
 
     response = client.post(
         "/orders",
@@ -19,7 +19,47 @@ def test_create_order_success(client, customer,):
     assert data["total_cents"] == 10
 
 
-def test_get_order_success(client, customer, order):
+def test_create_order_with_items_success_returns_201(client, customer,):
+
+    response = client.post(
+        "/orders/with-items",
+        json={
+            "customer_id": customer['id'],
+            "status": 'pending',
+            "items": [
+                {
+                    'product_name': 'toy',
+                    'quantity': 2,
+                    'unit_price_cents': 50,
+                },
+                {
+                    'product_name': 'book',
+                    'quantity': 1,
+                    'unit_price_cents': 200,
+                }
+            ]
+        },
+    )
+
+    data = response.json()
+    assert response.status_code == 201
+
+    assert data['id'] is not None
+    assert data['created_at'] is not None
+    assert data['total_cents'] == 300
+
+    assert data['customer']['id'] == customer['id']
+
+    assert len(data['items']) == 2
+    returned_item_data = data['items'][0]
+
+    assert returned_item_data['product_name'] == 'toy'
+    assert returned_item_data['order_id'] == data['id']
+    assert returned_item_data['id'] is not None
+    assert 'status' not in data
+
+
+def test_get_order_success_returns_200(client, customer, order):
     order_id = order['id']
 
     response = client.get(f"/orders/{order_id}")
@@ -39,7 +79,7 @@ def test_get_order_success(client, customer, order):
     assert 'internal_note' not in data['customer']
 
 
-def test_get_order_with_items_success(client, customer, order, item):
+def test_get_order_with_items_success_returns_200(client, customer, order, item):
 
     order_id = order['id']
     customer_id = customer['id']
@@ -70,7 +110,7 @@ def test_get_order_with_items_success(client, customer, order, item):
     assert returned_item['quantity'] == item['quantity']
 
 
-def test_list_orders_filter_by_status_success(client, make_order):
+def test_list_orders_filter_by_status_success_returns_200(client, make_order):
     
     paid_order = make_order(total_cents = 20, status = 'paid')
     pending_order = make_order(total_cents = 10, status = 'pending')
@@ -93,7 +133,7 @@ def test_list_orders_filter_by_status_success(client, make_order):
     assert 'status' not in data[0]
 
 
-def test_list_orders_sort_by_total_cents_ascending_success(client, make_order):
+def test_list_orders_sort_by_total_cents_ascending_success_returns_200(client, make_order):
     
     first_order = make_order(total_cents = 20, status = 'paid')
     second_order = make_order(total_cents = 10, status = 'paid')
@@ -115,7 +155,7 @@ def test_list_orders_sort_by_total_cents_ascending_success(client, make_order):
     assert data[2]['total_cents'] == third_order['total_cents']
 
 
-def test_list_orders_paginates_success(client, make_order):
+def test_list_orders_paginates_success_returns_200(client, make_order):
     
     first_order = make_order(total_cents = 20, status = 'pending')
     second_order = make_order(total_cents = 10, status = 'pending')
@@ -140,7 +180,7 @@ def test_list_orders_paginates_success(client, make_order):
     assert 'status' not in data
 
 
-def test_list_orders_no_matches_returns_empty_list(client):
+def test_list_orders_no_matches_returns_empty_list_returns_200(client):
     response = client.get(
         '/orders',
         params={
@@ -154,7 +194,7 @@ def test_list_orders_no_matches_returns_empty_list(client):
     assert len(data) == 0
 
 
-def test_update_order_success(client, customer, order):
+def test_update_order_success_returns_200(client, customer, order):
 
     order_id = order['id']
 
