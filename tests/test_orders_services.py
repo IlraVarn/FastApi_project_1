@@ -1,5 +1,7 @@
 import pytest 
-from errors import ConflictError, ItemNotFoundError, OrderNotFoundError, CustomerNotFoundError
+from errors import (ConflictError, ItemNotFoundError, 
+                    OrderNotFoundError, CustomerNotFoundError, 
+                    DataIntegrityError)
 from models import OrderCreate, CustomerCreate, OrderItemCreate, OrderUpdate, Order
 from services.customers import (create_customer_service)
 from services.orders import (create_order_service,
@@ -189,6 +191,7 @@ def test_list_orders_service_paginates_success(db_session, make_db_order):
     assert len(returned_orders) == 1
     assert returned_orders[0].id == first_order.id
 
+
 def test_list_orders_service_sorts_by_total_cents_success(db_session, make_db_order):
 
     first_order = make_db_order(total_cents = 10, status = 'paid')
@@ -241,12 +244,8 @@ def test_update_order_success(db_session, db_order):
     assert returned_order.status == 'pending'
 
 
-def test_update_order_not_found(db_session):
+def test_update_order_service_order_not_found(db_session):
     
-    order_update=OrderUpdate(
-        total_cents=20, 
-        status='pending')
-
     with pytest.raises(OrderNotFoundError) as error:
         update_order_service(
             order_id=999, 
@@ -255,6 +254,18 @@ def test_update_order_not_found(db_session):
             session=db_session)
 
     assert error.value.detail == 'order not found'
+
+
+def test_update_order_service_invalid_status_raises_DataIntegrityError(db_session, db_order):
+    
+    with pytest.raises(DataIntegrityError) as error:
+        update_order_service(
+            order_id=db_order.id, 
+            total_cents=10,
+            status='banana',
+            session=db_session)
+
+    assert error.value.detail == 'database integrity error'
 
 
 def test_delete_order_service_success(db_session, db_order):

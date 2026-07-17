@@ -1,5 +1,8 @@
 import pytest 
-from errors import ConflictError, ItemNotFoundError, OrderNotFoundError
+from errors import (ConflictError, ItemNotFoundError, 
+                    OrderNotFoundError, 
+                    DataIntegrityError)
+
 from models import OrderItemCreate
 from services.items import create_item_service, list_items_service
 
@@ -134,4 +137,19 @@ def test_create_item_order_not_found(db_session):
             session=db_session)
         
     assert error.value.detail == 'order not found'
+
                             
+def test_create_item_service_quantity_zero_raises_data_integrity_error(
+    db_session,
+    db_order,
+):
+    with pytest.raises(DataIntegrityError) as error:
+        create_item_service(
+            order_id=db_order.id,
+            product_name="toy",
+            quantity=0,
+            unit_price_cents=100,
+            session=db_session,
+        )
+
+    assert error.value.detail == "database integrity error"

@@ -18,7 +18,8 @@ from models import (
     OrderDetailPublic,
     OrderDetailWithItemsPublic,
     OrderUpdate,
-     OrderSortBy, OrderSortDirection, OrderStatus)
+     OrderSortBy, OrderSortDirection, OrderStatus,
+     OrderWithItemsCreate)
 
 from services.orders import (
     create_order_service,
@@ -27,6 +28,7 @@ from services.orders import (
     list_orders_service,
     update_order_service,
     delete_order_service,
+    create_order_with_items_service
 )
 
 
@@ -55,6 +57,41 @@ def create_order(
                             ) from error
     
     return to_order_public(db_order)
+
+
+@router.post(
+    "/with-items",
+    response_model=OrderDetailPublic,
+    status_code=201,
+)
+def create_order_with_items(
+    order_data: OrderWithItemsCreate,
+    session: Session = Depends(get_session),
+) -> OrderDetailPublic:
+    try:
+        db_order, db_customer, db_items = create_order_with_items_service(
+            customer_id=order_data.customer_id,
+            status=order_data.status,
+            items=order_data.items,
+            session=session,
+        )
+
+    except CustomerNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=error.detail,
+        ) from error
+
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from error
+
+    return to_order_detail_public(
+        db_order=db_order,
+        db_customer=db_customer,
+    )
 
 
 

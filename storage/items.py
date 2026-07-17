@@ -27,9 +27,6 @@ def create_item_record(
     return db_item
 
 
-
-
-
 def list_items_by_order_id(
         *,
         order_id: int,

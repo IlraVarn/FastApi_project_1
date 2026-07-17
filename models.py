@@ -46,7 +46,6 @@ class CustomerPublic(SQLModel):
     email: str
 
 
-
 #ORDERS
 class Order(SQLModel, table=True):
     __table_args__ = (
@@ -61,6 +60,7 @@ class Order(SQLModel, table=True):
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
 
+
 class OrderCreate(SQLModel):
     customer_id: int = Field(ge=1)
     total_cents: int = Field(ge=0)
@@ -73,6 +73,12 @@ class OrderCreate(SQLModel):
             return value.strip().lower()
 
         return value
+    
+    
+class OrderWithItemsCreate(SQLModel):
+    customer_id: int = Field(ge=1)
+    status: Literal['paid', 'pending']
+    items: list[ItemsForOrderWithItemsCreate] = Field(min_length=1)
 
 
 class OrderUpdate(SQLModel):
@@ -112,9 +118,9 @@ class OrderItem(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="order.id")
-    product_name: str
-    quantity: int
-    unit_price_cents: int
+    product_name: str = Field(nullable=False)
+    quantity: int = Field(nullable=False)
+    unit_price_cents: int = Field(nullable=False)
 
 
 class OrderItemCreate(SQLModel):
@@ -132,6 +138,25 @@ class OrderItemCreate(SQLModel):
             raise ValueError("must not be blank")
 
         return value
+    
+
+#MULTI WRITE
+class ItemsForOrderWithItemsCreate(SQLModel):
+    product_name: str = Field(min_length=1)
+    quantity: int = Field(gt=0)
+    unit_price_cents: int = Field(ge=0)
+
+    @field_validator("product_name")
+    @classmethod
+    def strip_and_reject_blank(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("must not be blank")
+
+        return value
+    
+
 
 
 class OrderItemPublic(SQLModel):
@@ -140,6 +165,9 @@ class OrderItemPublic(SQLModel):
     product_name: str
     quantity: int
     unit_price_cents: int
+
+
+
 
 
 
@@ -152,6 +180,7 @@ CustomerSortDirection = Literal["asc", "desc"]
 OrderSortBy = Literal["created_at", "total_cents", "id"]
 OrderSortDirection = Literal["asc", "desc"]
 OrderStatus = Literal["paid", "pending"]
+
 ORDER_SORT_COLUMNS = {
     "created_at": Order.created_at,
     "total_cents": Order.total_cents,

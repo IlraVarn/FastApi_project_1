@@ -34,7 +34,11 @@ def to_order_public(db_order: Order) -> OrderPublic:
         total_cents= db_order.total_cents,
     )
 
-def to_order_detail_public(db_order: Order, db_customer: Customer) -> OrderDetailPublic:
+def to_order_detail_public(
+        db_order: Order, 
+        db_customer: Customer
+        ) -> OrderDetailPublic:
+    
     assert db_order.id is not None
 
     return OrderDetailPublic(

@@ -4,7 +4,8 @@ from sqlmodel import Session, select, col
 
 from errors import CustomerNotFoundError, OrderNotFoundError, DataIntegrityError, ConflictError
 from models import (Customer, Order, OrderCreate, OrderItem, OrderUpdate, 
-                    OrderSortDirection, OrderSortBy, OrderStatus)
+                    OrderSortDirection, OrderSortBy, OrderStatus,
+                    ItemsForOrderWithItemsCreate)
 from typing import Literal
 from sqlalchemy import asc, desc
 from storage.customers import get_customer_by_id
@@ -13,7 +14,7 @@ from storage.orders import (add_order_record,
                             update_order,
                             delete_order_record,
                             list_orders)
-from storage.items import list_items_by_order_id
+from storage.items import list_items_by_order_id, create_item_record
 
 
 def create_order_service(
@@ -172,3 +173,64 @@ def list_orders_service(
     return db_orders
 
 
+def create_order_with_items_service(
+    *,
+    customer_id: int,
+    status: OrderStatus,
+    items: list[ItemsForOrderWithItemsCreate],
+    session: Session,
+) -> tuple[Order, Customer, list[OrderItem]]:
+    db_customer = get_customer_by_id(
+        customer_id=customer_id,
+        session=session,
+    )
+
+    if db_customer is None:
+        raise CustomerNotFoundError()
+
+    total_cents = 0
+
+    for item in items:
+        total_cents += item.quantity * item.unit_price_cents
+
+    try:
+        db_order = add_order_record(
+            customer_id=customer_id,
+            total_cents=total_cents,
+            status=status,
+            session=session,
+        )
+
+        session.flush()
+
+        order_id = db_order.id
+
+        if order_id is None:
+            session.rollback()
+            raise DataIntegrityError()
+
+        db_items: list[OrderItem] = []
+
+        for item in items:
+            db_item = create_item_record(
+                order_id=order_id,
+                product_name=item.product_name,
+                quantity=item.quantity,
+                unit_price_cents=item.unit_price_cents,
+                session=session,
+            )
+
+            db_items.append(db_item)
+
+        session.commit()
+
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
+    session.refresh(db_order)
+
+    for db_item in db_items:
+        session.refresh(db_item)
+
+    return db_order, db_customer, db_items
