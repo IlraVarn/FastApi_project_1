@@ -11,7 +11,11 @@ from main import app
 from services.customers import create_customer_service
 from services.orders import create_order_service
 from services.items import create_item_service
-from models import CustomerCreate, OrderCreate, OrderItemCreate
+from models import (CustomerCreate, 
+                    OrderCreate, 
+                    OrderItemCreate, 
+                    ItemForOrderWithItemsCreate)
+
 from typing import Literal
 
 from sqlalchemy import event
@@ -169,7 +173,7 @@ def make_item(client, order):
 
 
 
-#service test fixtures
+#SERVICE TEST FIXTURES
 
 
 @pytest.fixture
@@ -263,3 +267,21 @@ def make_db_item_for_order(db_session, db_order):
         )
 
     return _make_db_item
+
+
+@pytest.fixture
+def make_item_input():
+    def _make_item_input(
+            product_name:str,
+            quantity: int,
+            unit_price_cents: int
+    ) -> ItemForOrderWithItemsCreate:
+        return ItemForOrderWithItemsCreate(
+                product_name=product_name,
+                quantity=quantity,
+                unit_price_cents=unit_price_cents,
+        )
+
+    return _make_item_input
+
+

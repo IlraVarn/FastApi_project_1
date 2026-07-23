@@ -17,6 +17,8 @@ from storage.customers import (get_customer_by_email,
                                get_customer_by_id,
                                add_customer_record,
                                list_customer_records)
+
+from storage.orders import list_orders_by_customer_id
 from typing import Literal
 
 
@@ -91,3 +93,30 @@ def list_customers_service(
     )
 
     return db_customers
+
+
+def get_customer_with_orders_service(
+    customer_id: int,
+    session: Session,
+) -> tuple[Customer, list[Order]]:
+    """Return one customer and all orders belonging to that customer.
+
+    Raises:
+        CustomerNotFoundError:
+            If the requested customer does not exist.
+    """
+
+    db_customer = get_customer_by_id(
+        customer_id=customer_id,
+        session=session,
+    )
+
+    if db_customer is None:
+        raise CustomerNotFoundError()
+
+    db_orders = list_orders_by_customer_id(
+        customer_id=customer_id,
+        session=session,
+    )
+
+    return db_customer, db_orders

@@ -1,6 +1,13 @@
-from models import (Customer, CustomerPublic, 
-                    Order, OrderPublic, OrderDetailPublic,
-                    OrderItem, OrderItemPublic, OrderDetailWithItemsPublic)
+from models import (Customer, 
+                    CustomerPublic, 
+                    Order, 
+                    OrderPublic, 
+                    OrderDetailPublic,
+                    OrderItem, 
+                    OrderItemPublic, 
+                    OrderDetailWithItemsPublic,
+                    OrderSummaryPerCustomerPublic,
+                    CustomerWithOrdersPublic)
 from sqlmodel import col
 
 #customer helpers
@@ -106,4 +113,36 @@ def to_item_public_list(
 
     return public_items
 
+
+
+def to_customer_with_orders_public(
+    db_customer: Customer,
+    db_orders: list[Order],
+) -> CustomerWithOrdersPublic:
+    """Convert persisted customer and order records 
+    to the public response."""
+
+
+    public_orders: list[OrderSummaryPerCustomerPublic] = []
+
+    for db_order in db_orders:
+        assert db_order.id is not None
+
+        public_order = OrderSummaryPerCustomerPublic(
+            id=db_order.id,
+            created_at=db_order.created_at,
+            total_cents=db_order.total_cents,
+            status=db_order.status,
+        )
+
+        public_orders.append(public_order)
+
+    assert db_customer.id is not None
+
+    return CustomerWithOrdersPublic(
+        id=db_customer.id,
+        name=db_customer.name,
+        email=db_customer.email,
+        orders=public_orders,
+    )
 

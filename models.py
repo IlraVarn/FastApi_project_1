@@ -1,4 +1,5 @@
-from sqlmodel import Field, SQLModel
+from __future__ import annotations
+from sqlmodel import Field, SQLModel, Relationship
 from pydantic import field_validator, EmailStr
 from datetime import datetime, UTC
 from typing import Literal
@@ -161,6 +162,24 @@ class OrderItemPublic(SQLModel):
     product_name: str
     quantity: int
     unit_price_cents: int
+
+
+#JOIN RESPONSE MODELS   
+class CustomerWithOrdersPublic(SQLModel):
+    id: int
+    name: str
+    email: str
+    orders: list[OrderSummaryPerCustomerPublic]
+
+
+class OrderSummaryPerCustomerPublic(SQLModel):
+    id: int
+    created_at: datetime
+    total_cents: int
+    status: str
+
+
+
 
 
 #CUSTOMERS SORT

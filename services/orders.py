@@ -13,7 +13,9 @@ from storage.orders import (add_order_record,
                             get_order_by_id, 
                             update_order,
                             delete_order_record,
-                            list_orders)
+                            list_orders,
+                            list_orders_by_customer_id,
+                            )
 from storage.items import list_items_by_order_id, create_item_record
 
 
@@ -206,6 +208,8 @@ def create_order_with_items_service(
 
         order_id = db_order.id
 
+        #the following defensive check catches the problem at the source. 
+        # Otherwise it surfaces at the end and loos like the items is the problem
         if order_id is None:
             session.rollback()
             raise DataIntegrityError()
@@ -235,3 +239,5 @@ def create_order_with_items_service(
         session.refresh(db_item)
 
     return db_order, db_customer, db_items
+
+

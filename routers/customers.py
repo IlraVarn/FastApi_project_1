@@ -5,14 +5,25 @@ from typing import Annotated
 
 
 from db import get_session
-from models import (CustomerPublic, Customer, CustomerCreate,
-                   CustomerSortDirection, CustomerSortBy)
+from models import (CustomerPublic, 
+                    Customer, 
+                    CustomerCreate,
+                    CustomerSortDirection, 
+                    CustomerSortBy,
+                    OrderSummaryPerCustomerPublic,
+                    CustomerWithOrdersPublic
+                    )
 
-from mappers import to_customer_public, to_customer_public_list
+from mappers import (to_customer_public, 
+                     to_customer_public_list,
+                     to_customer_with_orders_public,
+)
+
 from services.customers import (
     create_customer_service, 
     read_customer_service,
     list_customers_service,
+    get_customer_with_orders_service
 )
                             
 
@@ -91,3 +102,29 @@ def list_customers(*,
      )
 
     return to_customer_public_list(db_customers)
+
+
+
+@router.get(
+    "/{customer_id}/orders",
+    response_model=CustomerWithOrdersPublic)
+def get_customer_with_orders(
+    customer_id: int,
+    session: Session = Depends(get_session),
+) -> CustomerWithOrdersPublic:
+    try:
+        db_customer, db_orders = get_customer_with_orders_service(
+            customer_id=customer_id,
+            session=session,
+        )
+
+    except CustomerNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail="customer not found",
+        ) from error
+
+    return to_customer_with_orders_public(
+        db_customer=db_customer,
+        db_orders=db_orders,
+    )

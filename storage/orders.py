@@ -93,3 +93,25 @@ def list_orders(
     db_orders = list(session.exec(statement).all())
 
     return db_orders
+
+
+def list_orders_by_customer_id(
+    customer_id: int,
+    session: Session,
+) -> list[Order]:
+    """Return all orders belonging to one customer.
+    Orders are returned newest first, with ID as the stable tie-breaker.
+    """
+
+    statement = (
+        select(Order)
+        .where(Order.customer_id == customer_id)
+        .order_by(
+            desc(col(Order.created_at)),
+            desc(col(Order.id)),
+        )
+    )
+
+    result = session.exec(statement)
+
+    return list(result.all())

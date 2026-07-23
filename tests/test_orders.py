@@ -219,6 +219,7 @@ def test_update_order_success_returns_200(client, customer, order):
     assert 'status' not in data
     assert 'internal_note' not in data['customer']
 
+    #checks that 'pending' is saved:
     list_response = client.get('/orders',
                                params={
                                    'status': 'pending'
@@ -259,6 +260,77 @@ def test_create_order_customer_not_found_returns_404(client):
 
     assert response.status_code == 404
     assert data == {'detail': 'customer not found'}
+
+
+def test_create_order_with_items_customer_not_found_returns_404(client, customer):
+
+    response = client.post(
+        "/orders/with-items",
+        json={
+            "customer_id": 999,
+            "status": 'pending',
+            "items": [
+                {
+                    'product_name': 'toy',
+                    'quantity': 2,
+                    'unit_price_cents': 50,
+                },
+                {
+                    'product_name': 'book',
+                    'quantity': 1,
+                    'unit_price_cents': 200,
+                }
+            ]
+        },
+    )
+
+    data = response.json()
+
+    assert response.status_code == 404
+    assert data == {'detail': 'customer not found'}
+
+
+def test_create_order_with_items_empty_items_list_returns_422(client, customer):
+
+    response = client.post(
+        "/orders/with-items",
+        json={
+            "customer_id": customer['id'],
+            "status": 'pending',
+            "items": []
+        },
+    )
+
+    data = response.json()
+
+    assert response.status_code == 422
+
+
+def test_create_order_with_items_invalid_item_quantity_returns_422(client, customer):
+
+    response = client.post(
+        "/orders/with-items",
+        json={
+            "customer_id": customer['id'],
+            "status": 'pending',
+            "items": [
+                {
+                    'product_name': 'toy',
+                    'quantity': 0,
+                    'unit_price_cents': 50,
+                },
+                {
+                    'product_name': 'book',
+                    'quantity': 1,
+                    'unit_price_cents': 200,
+                }
+            ]
+        },
+    )
+
+    data = response.json()
+
+    assert response.status_code == 422
 
 
 def test_get_order_missing_returns_404(client):

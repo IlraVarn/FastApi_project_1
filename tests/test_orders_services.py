@@ -1,15 +1,23 @@
 import pytest 
+from sqlmodel import select
 from errors import (ConflictError, ItemNotFoundError, 
                     OrderNotFoundError, CustomerNotFoundError, 
                     DataIntegrityError)
-from models import OrderCreate, CustomerCreate, OrderItemCreate, OrderUpdate, Order
+from models import (OrderCreate, 
+                    CustomerCreate, 
+                    OrderItemCreate, 
+                    OrderUpdate, 
+                    Order,
+                    ItemForOrderWithItemsCreate,
+                    OrderItem)
 from services.customers import (create_customer_service)
 from services.orders import (create_order_service,
                              get_order_detail_service,
                              get_order_detail_with_items_service,
                              list_orders_service,
                              update_order_service,
-                             delete_order_service,)
+                             delete_order_service,
+                             create_order_with_items_service)
 from services.items import create_item_service
 
 
@@ -290,5 +298,78 @@ def test_delete_order_service_with_items_raises_conflict_error(db_session, db_or
     
     assert error.value.detail == 'order cannot be deleted with items'
     assert db_item.id is not None
+
+
+#MULTI WRITE TESTS
+
+def test_create_order_with_items_service_success(db_session, db_customer, make_item_input):
+
+    items = [
+        make_item_input(
+            product_name="toy",
+            quantity=2,
+            unit_price_cents=50
+        ),
+        make_item_input(
+            product_name="book",
+            quantity=1,
+            unit_price_cents=200
+            )
+    ]
+
+    db_order, returned_customer, db_items = create_order_with_items_service(
+        customer_id= db_customer.id,
+        status= 'paid',
+        items= items,
+        session=db_session,
+    )
+
+    assert db_order.id is not None
+    assert db_order.created_at is not None
+    assert db_order.customer_id == db_customer.id
+    assert db_order.total_cents == 300
+    assert db_order.status == 'paid'
+
+    assert returned_customer.id == db_customer.id
+
+    assert len(db_items) == 2
+
+    assert db_items[0].id is not None
+    assert db_items[0].order_id == db_order.id
+    assert db_items[0].product_name == 'toy'
+    assert db_items[0].quantity == 2
+    assert db_items[0].unit_price_cents == 50
+
+    assert db_items[1].id is not None
+    assert db_items[1].order_id == db_order.id
+    assert db_items[1].product_name == 'book'
+    assert db_items[1].quantity == 1
+    assert db_items[1].unit_price_cents == 200
+
+
+def test_create_order_with_items_service_customer_not_found(db_session, db_customer, make_item_input):
+
+    items = [
+        make_item_input(
+            product_name="toy",
+            quantity=2,
+            unit_price_cents=50
+        ),
+        make_item_input(
+            product_name="book",
+            quantity=1,
+            unit_price_cents=200
+            )
+    ]
+
+    with pytest.raises(CustomerNotFoundError) as error:
+        db_order, returned_customer, db_items = create_order_with_items_service(
+        customer_id= 999,
+        status= 'paid',
+        items= items,
+        session=db_session,
+    )
+        
+    assert error.value.detail == 'customer not found'
 
 
