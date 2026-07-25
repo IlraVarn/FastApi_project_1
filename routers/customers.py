@@ -62,7 +62,7 @@ def create_customer(
     return to_customer_public(db_customer)
 
 
-@router.get("/{customer_id}", response_model=CustomerPublic, status_code=200)
+@router.get("/{customer_id}", response_model=CustomerPublic)
 def read_customer(
     customer_id: int,
     session: Session = Depends(get_session),
@@ -107,7 +107,7 @@ def list_customers(*,
 
 @router.get(
     "/{customer_id}/orders",
-    response_model=CustomerWithOrdersPublic)
+    response_model=CustomerWithOrdersPublic,)
 def get_customer_with_orders(
     customer_id: int,
     session: Session = Depends(get_session),

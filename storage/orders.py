@@ -115,3 +115,25 @@ def list_orders_by_customer_id(
     result = session.exec(statement)
 
     return list(result.all())
+
+
+def list_order_customer_pairs(
+    session: Session,
+) -> list[tuple[Order, Customer]]:
+    """Return every order together with its referenced customer."""
+
+    statement = (
+        select(Order, Customer)
+        .join(
+            Customer,
+            Customer.id == Order.customer_id,
+        )
+        .order_by(
+            desc(Order.created_at),
+            desc(Order.id),
+        )
+    )
+
+    result = session.exec(statement)
+
+    return list(result.all())
