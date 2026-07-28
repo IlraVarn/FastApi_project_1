@@ -5,6 +5,7 @@ from models import (Order, OrderItem, OrderUpdate,
                     Customer, OrderStatus, 
                     OrderSortBy, OrderSortDirection)
 from models import ORDER_SORT_COLUMNS
+from typing import Any
 
 
 def add_order_record(
@@ -126,14 +127,33 @@ def list_order_customer_pairs(
         select(Order, Customer)
         .join(
             Customer,
-            Customer.id == Order.customer_id,
+            col(Customer.id) == Order.customer_id,
         )
         .order_by(
-            desc(Order.created_at),
-            desc(Order.id),
+            desc(col(Order.created_at)),
+            desc(col(Order.id)),
         )
     )
 
     result = session.exec(statement)
 
     return list(result.all())
+
+
+def update_order_patch(
+    *,
+    db_order: Order,
+    update_data: dict[str, Any],
+    session: Session,
+) -> Order:
+    """Apply validated fields to an existing Order 
+    and stage it for persistence.
+    Does not commit, rollback, or refresh.
+    """
+
+    db_order.sqlmodel_update(update_data)
+    session.add(db_order)
+
+    return db_order
+
+

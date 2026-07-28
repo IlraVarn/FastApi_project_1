@@ -2,11 +2,17 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 
-from errors import CustomerNotFoundError, OrderNotFoundError, DataIntegrityError, ConflictError
+from errors import (CustomerNotFoundError, 
+                    OrderNotFoundError, 
+                    DataIntegrityError, 
+                    ConflictError,
+                    InvalidOrderStateTransitionError,
+                    InvalidOrderUpdateError,)
 from models import (Customer, Order, OrderCreate, OrderItem, OrderUpdate, 
                     OrderSortDirection, OrderSortBy, OrderStatus,
-                    ItemForOrderWithItemsCreate)
-from typing import Literal
+                    ItemForOrderWithItemsCreate,
+                    OrderUpdatePatch)
+from typing import Literal, Any
 from sqlalchemy import asc, desc
 from storage.customers import get_customer_by_id
 from storage.orders import (add_order_record, 
@@ -15,6 +21,7 @@ from storage.orders import (add_order_record,
                             delete_order_record,
                             list_orders,
                             list_orders_by_customer_id,
+                            update_order_patch
                             )
 from storage.items import list_items_by_order_id, create_item_record
 
@@ -241,3 +248,75 @@ def create_order_with_items_service(
     return db_order, db_customer, db_items
 
 
+def update_order_patch_service(
+    *,
+    order_id: int,
+    update_data: dict[str, Any],
+    session: Session,
+) -> tuple[Order, Customer]:
+    """Partially update an existing order and commit the valid result.
+
+    Only fields supplied by the client are changed.
+
+    Raises:
+        OrderNotFoundError: The requested order does not exist.
+        InvalidOrderUpdateError: The request is empty or supplies null.
+        InvalidOrderStateTransitionError: The requested change conflicts
+            with the order's current state.
+        DataIntegrityError: Stored relationships or database writes fail.
+    """
+
+    db_order = get_order_by_id(
+        order_id=order_id,
+        session=session,
+    )
+
+    if db_order is None:
+        raise OrderNotFoundError()
+
+    db_customer = get_customer_by_id(
+        customer_id=db_order.customer_id,
+        session=session,
+    )
+
+    if db_customer is None:
+        raise DataIntegrityError()
+
+    
+    if not update_data:
+        raise InvalidOrderUpdateError()
+
+    for value in update_data.values():
+        if value is None:   
+            raise InvalidOrderUpdateError()
+
+    changing_total = (
+        "total_cents" in update_data
+        and update_data["total_cents"] != db_order.total_cents
+    )
+
+    changing_status = (
+        "status" in update_data
+        and update_data["status"] != db_order.status
+    )
+
+    if db_order.status == "paid":
+        if changing_total or changing_status:
+            raise InvalidOrderStateTransitionError()
+
+    try:
+        update_order_patch(
+            db_order=db_order,
+            update_data=update_data,
+            session=session,
+        )
+
+        session.commit()
+
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
+    session.refresh(db_order)
+
+    return db_order, db_customer

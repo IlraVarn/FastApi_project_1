@@ -1,13 +1,14 @@
 from __future__ import annotations
 from sqlmodel import Field, SQLModel, Relationship
-from pydantic import field_validator, EmailStr
+from pydantic import field_validator, EmailStr, ConfigDict
 from datetime import datetime, UTC
-from typing import Literal
+from typing import Literal, ClassVar
 from sqlalchemy import CheckConstraint
 
 
 #CUSTOMERS
 class Customer(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "customer"
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="ck_customer_name_non_empty"),
         CheckConstraint("length(trim(email)) > 0", name="ck_customer_email_non_empty"),
@@ -49,6 +50,7 @@ class CustomerPublic(SQLModel):
 
 #ORDERS
 class Order(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "order"
     __table_args__ = (
         CheckConstraint("customer_id > 0", name="ck_customer_id_positive"),
         CheckConstraint("total_cents > 0", name="ck_total_cents_non_negative"),
@@ -60,6 +62,17 @@ class Order(SQLModel, table=True):
     customer_id: int = Field(nullable=False, foreign_key='customer.id')
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
+
+
+class OrderUpdatePatch(SQLModel, extra="forbid"):
+
+    total_cents: int | None = Field(default=None, ge=0)
+    status: OrderStatus | None = None
+
+
+class OrderUpdate(SQLModel):
+    total_cents: int = Field(ge=0)
+    status: OrderStatus
 
 
 class OrderCreate(SQLModel):
@@ -80,11 +93,6 @@ class OrderWithItemsCreate(SQLModel):
     customer_id: int = Field(ge=1)
     status: Literal['paid', 'pending']
     items: list[ItemForOrderWithItemsCreate] = Field(min_length=1)
-
-
-class OrderUpdate(SQLModel):
-    total_cents: int = Field(ge=0)
-    status: Literal['paid', 'pending']
 
 
 class OrderPublic(SQLModel):
@@ -111,6 +119,8 @@ class OrderDetailWithItemsPublic(SQLModel):
 
 #ITEMS
 class OrderItem(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "order_item"
+
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
         CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),

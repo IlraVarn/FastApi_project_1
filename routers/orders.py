@@ -5,7 +5,11 @@ from sqlmodel import Session
 
 from db import get_session
 from errors import (ConflictError, 
-                    OrderNotFoundError, CustomerNotFoundError, DataIntegrityError)
+                    OrderNotFoundError, 
+                    CustomerNotFoundError, 
+                    DataIntegrityError,
+                    InvalidOrderUpdateError,
+                    InvalidOrderStateTransitionError)
 from mappers import (
     to_order_public,
     to_order_detail_public,
@@ -20,7 +24,8 @@ from models import (
     OrderUpdate,
      OrderSortBy, OrderSortDirection, OrderStatus,
      ItemForOrderWithItemsCreate, 
-     OrderWithItemsCreate)
+     OrderWithItemsCreate,
+     OrderUpdatePatch)
 
 from services.orders import (
     create_order_service,
@@ -29,7 +34,8 @@ from services.orders import (
     list_orders_service,
     update_order_service,
     delete_order_service,
-    create_order_with_items_service
+    create_order_with_items_service,
+    update_order_patch_service
 )
 
 
@@ -210,3 +216,51 @@ def list_orders(
 
     return to_order_public_list(db_orders)
 
+
+
+@router.patch(
+    "/{order_id}",
+    response_model=OrderDetailPublic,
+)
+def patch_order(
+    order_id: int,
+    order_update: OrderUpdatePatch,
+    session: Session = Depends(get_session),
+) -> OrderDetailPublic:
+    """Partially update one order and return its updated public state."""
+
+    try:
+        db_order, db_customer = update_order_patch_service(
+            order_id=order_id,
+            order_update=order_update,
+            session=session,
+        )
+
+    except OrderNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=error.detail,
+        ) from error
+
+    except InvalidOrderUpdateError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=error.detail,
+        ) from error
+
+    except InvalidOrderStateTransitionError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=error.detail,
+        ) from error
+
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from error
+
+    return to_order_detail_public(
+        db_order=db_order,
+        db_customer=db_customer,
+    )
