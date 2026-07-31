@@ -69,14 +69,36 @@ def test_get_order_success_returns_200(client, customer, order):
 
     assert data['id'] == order_id
     assert data['created_at'] is not None
-    assert data['total_cents'] == 10
-    assert 'status' not in data
+    assert data['total_cents'] == order['total_cents']
+    assert data['status'] == 'paid'
     assert 'customer_id' not in data
 
     assert data['customer']['id'] == order['customer_id']
     assert data['customer']['name'] == customer['name']
     assert data['customer']['email'] == customer['email']
     assert 'internal_note' not in data['customer']
+
+
+def test_get_archived_order_returns_404(
+    client,
+    make_order,
+):
+    order = make_order(
+        total_cents=5000,
+        status="paid",
+    )
+
+    archive_response = client.delete(
+        f"/orders/{order['id']}",
+    )
+
+    assert archive_response.status_code == 204
+
+    get_response = client.get(
+        f"/orders/{order['id']}",
+    )
+
+    assert get_response.status_code == 404
 
 
 def test_get_order_with_items_success_returns_200(client, customer, order, item):
@@ -93,8 +115,7 @@ def test_get_order_with_items_success_returns_200(client, customer, order, item)
     assert data['created_at'] is not None
     assert data['total_cents'] == 10
     assert 'customer_id' not in data
-    assert 'status' not in data
-
+    
     assert data['customer']['id'] == customer_id
     assert data['customer']['name'] == customer['name']
     assert data['customer']['email'] == customer['email']
@@ -211,12 +232,12 @@ def test_update_order_success_returns_200(client, customer, order):
     assert data['id'] == order_id
     assert data['created_at'] is not None
     assert data['total_cents'] == 50
+    assert data['status'] == 'pending'
 
     assert data['customer']['id'] == customer['id']
     assert data['customer']['name'] == customer['name']
     assert data['customer']['email'] == customer['email']
 
-    assert 'status' not in data
     assert 'internal_note' not in data['customer']
 
     #checks that 'pending' is saved:
@@ -230,19 +251,6 @@ def test_update_order_success_returns_200(client, customer, order):
     assert len(list_data) == 1
     assert list_data[0]['id'] == order_id
 
-
-def test_delete_order_success(client, order):
-
-    order_id = order['id']
-
-    response = client.delete(f'/orders/{order_id}')
-
-    assert response.status_code == 200
-    assert response.json() == {"ok": True}
-
-    get_response = client.delete(f'/orders/{order_id}')    
-    
-    assert get_response.status_code == 404
 
 #failure tests
 def test_create_order_customer_not_found_returns_404(client):
@@ -366,22 +374,55 @@ def test_update_order_missing_returns_404(client):
     assert data == {'detail': 'order not found'}
 
 
-def test_delete_order_missing_returns_404(client):
-    response = client.delete('/orders/999')
+
+def test_patch_order_missing_returns_404(client):
+    response = client.patch(
+        "/orders/999999",
+        json={
+            "status": "paid",
+        },
+    )
 
     assert response.status_code == 404
-    assert response.json() == {'detail': 'order not found'}
 
 
-def test_delete_order_with_items_returns_409(client, order, item):
+def test_patch_paid_order_to_pending_returns_409(
+    client,
+    make_order,
+):
+    order = make_order(
+        total_cents=5000,
+        status="paid",
+    )
+
+    response = client.patch(
+        f"/orders/{order['id']}",
+        json={
+            "status": "pending",
+        },
+    )
+
+    assert response.status_code == 409
+
+
+def test_archive_order_is_idempotent(client, order):
 
     order_id = order['id']
 
     response = client.delete(f'/orders/{order_id}')
 
-    assert response.status_code == 409
-    assert response.json() == {
-        'detail': 'order cannot be deleted with items'
-        }
+    assert response.status_code == 204
+    assert response.content == b""
 
+    second_response = client.delete(f'/orders/{order_id}')    
+    
+    assert second_response.status_code == 204
+    assert second_response.content == b""
+
+
+def test_archive_order_missing_returns_404(client):
+    response = client.delete('/orders/999')
+
+    assert response.status_code == 404
+    assert response.json() == {'detail': 'order not found'}
 

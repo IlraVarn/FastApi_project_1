@@ -9,7 +9,7 @@ from models import (Order, OrderItemCreate, OrderItem,
                     ITEM_SORT_COLUNMS, ItemSortBy, ItemsSortDirection)
 from typing import Literal
 from sqlalchemy import asc, desc 
-from storage.orders import get_order_by_id
+from storage.orders import get_active_order_by_id
 from storage.items import create_item_record, list_items_sorted
 
 
@@ -23,7 +23,7 @@ def create_item_service(
     session: Session
         )->OrderItem:
 
-    db_order = get_order_by_id(order_id=order_id, session=session)
+    db_order = get_active_order_by_id(order_id=order_id, session=session)
 
     if db_order is None:
         raise OrderNotFoundError()

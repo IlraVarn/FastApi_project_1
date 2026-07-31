@@ -16,12 +16,13 @@ from typing import Literal, Any
 from sqlalchemy import asc, desc
 from storage.customers import get_customer_by_id
 from storage.orders import (add_order_record, 
-                            get_order_by_id, 
+                            get_active_order_by_id, 
                             update_order,
-                            delete_order_record,
-                            list_orders,
+                            list_active_orders,
                             list_orders_by_customer_id,
-                            update_order_patch
+                            update_order_patch,
+                            get_order_by_id_include_archived,
+                            archive_order_record,
                             )
 from storage.items import list_items_by_order_id, create_item_record
 
@@ -51,6 +52,7 @@ def create_order_service(
 
     except IntegrityError as error:
         session.rollback()
+        print(error)
         raise DataIntegrityError() from error
     
     session.refresh(db_order)
@@ -63,7 +65,7 @@ def get_order_detail_service(
     session: Session,
 ) -> tuple[Order, Customer]:
     
-    db_order = get_order_by_id(
+    db_order = get_active_order_by_id(
         order_id=order_id, 
         session=session)
 
@@ -101,7 +103,7 @@ def update_order_service(
     session: Session,
 ) -> tuple[Order, Customer]:
     
-    db_order = get_order_by_id(
+    db_order = get_active_order_by_id(
         order_id=order_id, 
         session=session)
 
@@ -131,36 +133,7 @@ def update_order_service(
     return db_order, db_customer
 
 
-def delete_order_service(
-    order_id: int,
-    session: Session,
-) -> None:
-    
-    db_order = get_order_by_id(
-        order_id=order_id, 
-        session=session)
-
-    if db_order is None:
-        raise OrderNotFoundError("order not found")
-    
-
-    db_items = list_items_by_order_id(
-        order_id=order_id,
-        session=session)
-
-    if db_items:
-        raise ConflictError('order cannot be deleted with items')
-
-    delete_order_record(db_order=db_order, session=session)
-
-    try:
-        session.commit()
-    except IntegrityError as error:
-        session.rollback()
-        raise DataIntegrityError() from error
-
-
-def list_orders_service(
+def list_active_orders_service(
         *,
         session: Session,               
         status: OrderStatus | None,
@@ -170,7 +143,7 @@ def list_orders_service(
         limit: int,
 ) -> list[Order]:
     
-    db_orders = list_orders(
+    db_orders = list_active_orders(
         session=session,               
         status=status,
         sort_by=sort_by,
@@ -266,7 +239,7 @@ def update_order_patch_service(
         DataIntegrityError: Stored relationships or database writes fail.
     """
 
-    db_order = get_order_by_id(
+    db_order = get_active_order_by_id(
         order_id=order_id,
         session=session,
     )
@@ -282,7 +255,7 @@ def update_order_patch_service(
     if db_customer is None:
         raise DataIntegrityError()
 
-    
+    #working with the dict
     if not update_data:
         raise InvalidOrderUpdateError()
 
@@ -320,3 +293,50 @@ def update_order_patch_service(
     session.refresh(db_order)
 
     return db_order, db_customer
+
+
+def archive_order_service(
+    *,
+    order_id: int,
+    session: Session,
+) -> None:
+    """Archive one order.
+
+    Repeated archive requests for the same existing order succeed 
+    without changing its original archive timestamp.
+
+    Raises:
+        OrderNotFoundError: No order exists with the requested ID.
+        DataIntegrityError: The database write fails.
+    """
+
+    db_order = get_order_by_id_include_archived(
+        order_id=order_id,
+        session=session,
+    )
+
+    if db_order is None:
+        raise OrderNotFoundError()
+
+    if db_order.archived_at is not None:
+        return
+
+    if db_order.status == 'pending':
+        raise InvalidOrderStateTransitionError()
+    
+    archived_at = datetime.now(UTC)
+
+    try:
+        archive_order_record(
+            db_order=db_order,
+            archived_at=archived_at,
+            session=session,
+        )
+
+        session.commit()
+
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
+

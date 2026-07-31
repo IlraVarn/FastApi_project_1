@@ -53,19 +53,25 @@ class Order(SQLModel, table=True):
     __tablename__: ClassVar[str] = "order"
     __table_args__ = (
         CheckConstraint("customer_id > 0", name="ck_customer_id_positive"),
-        CheckConstraint("total_cents > 0", name="ck_total_cents_non_negative"),
+        CheckConstraint("total_cents >= 0", name="ck_total_cents_non_negative"),
         CheckConstraint("status IN ('paid', 'pending')", name="ck_order_status_valid"),
         )
     
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime = Field(nullable=False)
-    customer_id: int = Field(nullable=False, foreign_key='customer.id')
+    customer_id: int = Field(
+        nullable=False, 
+        foreign_key='customer.id',
+        index=True)
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
+    archived_at: datetime | None = Field(default=None, nullable=True)
 
 
-class OrderUpdatePatch(SQLModel, extra="forbid"):
-
+class OrderUpdatePatch(SQLModel):
+    """ extra= forbid sends back 422 if clent sends additional field.
+    rejects fields the client cannot mutate"""
+    model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
     total_cents: int | None = Field(default=None, ge=0)
     status: OrderStatus | None = None
 
@@ -107,6 +113,7 @@ class OrderDetailPublic(SQLModel):
     created_at: datetime
     customer: CustomerPublic
     total_cents: int
+    status: str
   
     
 class OrderDetailWithItemsPublic(SQLModel):
@@ -127,7 +134,10 @@ class OrderItem(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="order.id", nullable=False)
+    order_id: int = Field(
+        foreign_key="order.id", 
+        nullable=False,
+        index=True)
     product_name: str = Field(nullable=False)
     quantity: int = Field(nullable=False)
     unit_price_cents: int = Field(nullable=False)

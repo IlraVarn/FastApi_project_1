@@ -1,8 +1,12 @@
 import pytest 
 from sqlmodel import select
-from errors import (ConflictError, ItemNotFoundError, 
-                    OrderNotFoundError, CustomerNotFoundError, 
-                    DataIntegrityError)
+from errors import (ConflictError, 
+                    ItemNotFoundError, 
+                    OrderNotFoundError, 
+                    CustomerNotFoundError, 
+                    DataIntegrityError,
+                    InvalidOrderStateTransitionError,
+                    InvalidOrderUpdateError)
 from models import (OrderCreate, 
                     CustomerCreate, 
                     OrderItemCreate, 
@@ -14,10 +18,11 @@ from services.customers import (create_customer_service)
 from services.orders import (create_order_service,
                              get_order_detail_service,
                              get_order_detail_with_items_service,
-                             list_orders_service,
+                             list_active_orders_service,
                              update_order_service,
-                             delete_order_service,
-                             create_order_with_items_service)
+                             create_order_with_items_service,
+                             update_order_patch_service,
+                             archive_order_service)
 from services.items import create_item_service
 
 
@@ -77,6 +82,28 @@ def test_get_order_detail_service_order_not_found(db_session):
         session=db_session
     )
         
+    assert error.value.detail == 'order not found'
+
+
+def test_archived_order_is_not_available_to_normal_read_service(
+    db_session,
+    make_db_order,
+):
+    db_order = make_db_order(
+        total_cents=5000,
+        status="paid",
+    )
+
+    archive_order_service(
+        order_id=db_order.id,
+        session=db_session,
+    )
+
+    with pytest.raises(OrderNotFoundError) as error:
+        get_order_detail_service(
+            order_id=db_order.id,
+            session=db_session,
+        )
     assert error.value.detail == 'order not found'
 
 
@@ -150,7 +177,7 @@ def test_list_orders_service_all_orders_success(db_session, make_db_order):
 
     second_order = make_db_order(total_cents = 10, status = 'pending')
 
-    returned_orders = list_orders_service(
+    returned_orders = list_active_orders_service(
         status=None, 
         sort_by='created_at',
         sort_dir='desc',
@@ -169,7 +196,7 @@ def test_list_orders_service_filters_by_status_success(db_session, make_db_order
 
     second_order = make_db_order(total_cents = 10, status = 'paid')
  
-    returned_orders = list_orders_service(
+    returned_orders = list_active_orders_service(
         status='paid', 
         sort_by='created_at',
         sort_dir='desc',
@@ -188,7 +215,7 @@ def test_list_orders_service_paginates_success(db_session, make_db_order):
 
     second_order = make_db_order(total_cents = 10, status = 'paid')
 
-    returned_orders = list_orders_service(
+    returned_orders = list_active_orders_service(
         status='paid', 
         sort_by='created_at',
         sort_dir='desc',
@@ -208,7 +235,7 @@ def test_list_orders_service_sorts_by_total_cents_success(db_session, make_db_or
 
     third_order = make_db_order(total_cents = 30, status = 'paid')
 
-    returned_orders = list_orders_service(
+    returned_orders = list_active_orders_service(
         status='paid', 
         sort_by='total_cents',
         sort_dir='desc',
@@ -226,7 +253,7 @@ def test_list_orders_service_no_matches_returns_empty_list_success(db_session, m
 
     first_order = make_db_order(total_cents = 20, status = 'paid')
 
-    returned_orders = list_orders_service(
+    returned_orders = list_active_orders_service(
         status='pending', 
         sort_by='created_at',
         sort_dir='desc',
@@ -276,28 +303,105 @@ def test_update_order_service_invalid_status_raises_DataIntegrityError(db_sessio
     assert error.value.detail == 'database integrity error'
 
 
-def test_delete_order_service_success(db_session, db_order):
+#PATCH TESTS
+def test_update_order_patch_service_updates_only_supplied_field(db_session, make_db_order):
+    db_order = make_db_order(
+        total_cents=5000,
+        status="pending",
+    )
 
-    delete_order_service(order_id=db_order.id, session=db_session)
+    update_data = {'status':'paid'}
 
-    assert db_session.get(Order, db_order.id) is None
+    returned_order, _ = update_order_patch_service(
+        order_id=db_order.id,
+        update_data=update_data,
+        session=db_session,
+    )
+
+    #ommitted field remains unchanged
+    assert returned_order.status == "paid"
+    assert returned_order.total_cents == 5000
 
 
-def test_delete_order_service_not_found(db_session):
+def test_update_order_patch_service_rejects_empty_update(
+    db_session,
+    make_db_order,
+):
+    db_order = make_db_order(
+        total_cents=5000,
+        status="pending",
+    )
+
+    update_data = {}
+
+    with pytest.raises(InvalidOrderUpdateError) as error:
+        update_order_patch_service(order_id=db_order.id,
+                update_data=update_data,
+                session=db_session,
+            )
+
+    assert error.value.detail == 'request is empty or supplies null'
+
+
+def test_update_order_patch_service_rejects_paid_to_pending(
+    db_session,
+    make_db_order,
+):
+    db_order = make_db_order(
+        total_cents=5000,
+        status="paid",
+    )
+
+    update_data = {'status': 'pending'}
+
+    with pytest.raises(InvalidOrderStateTransitionError)as error:
+        update_order_patch_service(order_id=db_order.id,
+                        update_data=update_data,
+                        session=db_session,
+                    )
+
+    db_session.refresh(db_order)
+
+    assert db_order.status == "paid"
+    assert db_order.total_cents == 5000
+
+    assert error.value.detail == "requested change conflicts with the order's current state"
+
+
+#ARCHIVE TESTS
+def test_archive_order_service_success(db_session, make_db_order):
+
+    db_order = make_db_order(total_cents=5000, status='paid')
+    assert db_order.archived_at is None
+
+    archive_order_service(order_id=db_order.id, session=db_session)
+    db_session.refresh(db_order)
+
+    assert db_order.archived_at is not None
+
+
+def test_archive_order_service_is_idempotent(db_session, make_db_order):
+
+    db_order = make_db_order(total_cents=5000, status='paid')
+    archive_order_service(order_id=db_order.id, session=db_session)
+
+    db_session.refresh(db_order)
+
+    first_archied_at = db_order.archived_at
+
+    archive_order_service(order_id=db_order.id, session=db_session)
+    db_session.refresh(db_order)
+
+    assert db_order.archived_at == first_archied_at
+
+
+def test_archive_order_service_not_found(db_session):
 
     with pytest.raises(OrderNotFoundError) as error:
-        delete_order_service(order_id=999, session=db_session)
+        archive_order_service(order_id=999, session=db_session)
     
     assert error.value.detail == 'order not found'
 
-
-def test_delete_order_service_with_items_raises_conflict_error(db_session, db_order, db_item):
-
-    with pytest.raises(ConflictError) as error:
-        delete_order_service(order_id=db_order.id, session=db_session)
-    
-    assert error.value.detail == 'order cannot be deleted with items'
-    assert db_item.id is not None
 
 
 #MULTI WRITE TESTS

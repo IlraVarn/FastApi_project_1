@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, col
-from sqlalchemy import asc, desc
+from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
 from models import (Order, OrderItem, OrderUpdate, 
                     Customer, OrderStatus, 
@@ -26,7 +26,22 @@ def add_order_record(
     return db_order
 
 
-def get_order_by_id(
+def get_active_order_by_id(
+    *,
+    order_id: int,
+    session: Session,
+) -> Order | None:
+    """Return an active Order by ID, or None if missing or archived."""
+
+    statement = select(Order).where(
+        col(Order.id) == order_id,
+        col(Order.archived_at).is_(None),
+    )
+
+    return session.exec(statement).first()
+
+
+def get_order_by_id_include_archived(
     *,
     order_id: int,
     session: Session,
@@ -35,32 +50,7 @@ def get_order_by_id(
     return session.get(Order, order_id)
 
 
-def update_order(
-        *,
-        db_order: Order,
-        total_cents: int,
-        status: str,
-        session: Session,
-    ) -> Order:
-
-    db_order.total_cents = total_cents
-    db_order.status = status
-
-
-    session.add(db_order)
-    return db_order
-
-
-def delete_order_record(
-        *,
-        db_order: Order, 
-        session: Session
-        )-> None:
-    
-    session.delete(db_order)
-
-
-def list_orders(
+def list_active_orders(
         *,
         session: Session,               
         status: OrderStatus | None,
@@ -69,8 +59,11 @@ def list_orders(
         offset: int,
         limit: int
     )-> list[Order]:
+    """Return filtered, sorted, active orders within 
+        one result page."""
     
-    statement = select(Order)
+    statement = select(Order).where(
+        col(Order.archived_at).is_(None))
 
     if status is not None:
         statement = statement.where(Order.status == status)
@@ -106,10 +99,11 @@ def list_orders_by_customer_id(
 
     statement = (
         select(Order)
-        .where(Order.customer_id == customer_id)
-        .order_by(
-            desc(col(Order.created_at)),
-            desc(col(Order.id)),
+        .where(
+            col(Order.archived_at).is_(None))
+            .order_by(
+                desc(col(Order.created_at)),
+                desc(col(Order.id)),
         )
     )
 
@@ -129,6 +123,7 @@ def list_order_customer_pairs(
             Customer,
             col(Customer.id) == Order.customer_id,
         )
+        .where(col(Order.archived_at).is_(None),)
         .order_by(
             desc(col(Order.created_at)),
             desc(col(Order.id)),
@@ -138,6 +133,41 @@ def list_order_customer_pairs(
     result = session.exec(statement)
 
     return list(result.all())
+
+
+def archive_order_record(
+    *,
+    db_order: Order,
+    archived_at: datetime,
+    session: Session,
+) -> Order:
+    """Set an Order's archive timestamp and stage it for persistence.
+
+    Does not commit, rollback, refresh, or decide whether archiving is allowed.
+    """
+
+    db_order.archived_at = archived_at
+    session.add(db_order)
+
+    return db_order
+
+
+#PATCH ORDER
+
+def update_order(
+        *,
+        db_order: Order,
+        total_cents: int,
+        status: str,
+        session: Session,
+    ) -> Order:
+
+    db_order.total_cents = total_cents
+    db_order.status = status
+
+
+    session.add(db_order)
+    return db_order
 
 
 def update_order_patch(
@@ -155,5 +185,43 @@ def update_order_patch(
     session.add(db_order)
 
     return db_order
+
+
+#COUNT
+def count_active_orders_by_status(
+    *,
+    session: Session,
+) -> list[tuple[str, int]]:
+    """Return the number of active orders in each status."""
+
+    statement = (
+        select(
+            col(Order.status),
+            func.count(col(Order.id)),
+        )
+        .where(
+            col(Order.archived_at).is_(None),
+        )
+        .group_by(
+            col(Order.status),
+        )
+        .order_by(
+            col(Order.status),
+        )
+    )
+
+    rows = session.exec(statement).all()
+
+    result: list[tuple[str, int]] = []
+
+    for status_value, order_count in rows:
+        result.append(
+            (
+                status_value,
+                int(order_count),
+            )
+        )
+
+    return result
 
 

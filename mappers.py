@@ -53,6 +53,7 @@ def to_order_detail_public(
         created_at=db_order.created_at,
         customer=to_customer_public(db_customer),
         total_cents=db_order.total_cents, 
+        status=db_order.status
     )
 
 def to_order_detail_with_items_public(

@@ -1,6 +1,12 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import (APIRouter, 
+                     Depends, 
+                     HTTPException, 
+                     Query, 
+                     Response, 
+                     status,
+)
 from sqlmodel import Session
 
 from db import get_session
@@ -31,11 +37,11 @@ from services.orders import (
     create_order_service,
     get_order_detail_service,
     get_order_detail_with_items_service,
-    list_orders_service,
+    list_active_orders_service,
     update_order_service,
-    delete_order_service,
     create_order_with_items_service,
-    update_order_patch_service
+    update_order_patch_service,
+    archive_order_service,
 )
 
 
@@ -173,28 +179,6 @@ def update_order(
     return to_order_detail_public(db_order, db_customer)
 
 
-@router.delete("/{order_id}")
-def delete_order(
-    order_id: int,
-    session: Session = Depends(get_session),
-):
-    try:
-        delete_order_service(
-            order_id=order_id,
-            session=session,
-        )
-    except OrderNotFoundError as error:
-        raise HTTPException(status_code=404, detail=error.detail)
-    
-    except ConflictError as error:
-        raise HTTPException(status_code=409, detail=error.detail)
-    
-    except DataIntegrityError as error:
-        raise HTTPException(status_code=500, detail='internal server error') from error
-
-    return {"ok": True}
-
-
 @router.get("", 
             response_model=list[OrderPublic])
 def list_orders(
@@ -205,7 +189,7 @@ def list_orders(
     sort_by: OrderSortBy = 'created_at',
     sort_dir: OrderSortDirection = 'desc'
 ):
-    db_orders = list_orders_service(
+    db_orders = list_active_orders_service(
         status=status,
         offset=offset,
         limit=limit,
@@ -229,10 +213,15 @@ def patch_order(
 ) -> OrderDetailPublic:
     """Partially update one order and return its updated public state."""
 
+    #convert request model into a dict
+    update_data = order_update.model_dump(
+            exclude_unset=True,
+        )
+    
     try:
         db_order, db_customer = update_order_patch_service(
             order_id=order_id,
-            order_update=order_update,
+            update_data=update_data,
             session=session,
         )
 
@@ -264,3 +253,43 @@ def patch_order(
         db_order=db_order,
         db_customer=db_customer,
     )
+
+
+
+
+
+@router.delete("/{order_id}", status_code=204)
+def archive_order(
+    order_id: int,
+    session: Session = Depends(get_session),
+) -> Response:
+    """Archive one order and return no response body."""
+
+    try:
+        archive_order_service(
+            order_id=order_id,
+            session=session,
+        )
+
+    except OrderNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=error.detail,
+        ) from error
+
+    except InvalidOrderStateTransitionError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=error.detail
+            ) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from error
+
+    return Response(
+        status_code=204,
+    )
+

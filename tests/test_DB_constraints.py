@@ -64,7 +64,7 @@ def test_order_total_cents_positive_constraint(db_session, db_customer):
     db_order = Order(
         customer_id=db_customer.id,
         created_at=datetime.now(UTC),
-        total_cents=0,
+        total_cents=-1,
         status="paid",
     )
 
