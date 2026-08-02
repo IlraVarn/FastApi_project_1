@@ -31,7 +31,9 @@ from models import (
      OrderSortBy, OrderSortDirection, OrderStatus,
      ItemForOrderWithItemsCreate, 
      OrderWithItemsCreate,
-     OrderUpdatePatch)
+     OrderUpdatePatch,
+     OrderStatusCountPublic,
+     )
 
 from services.orders import (
     create_order_service,
@@ -42,6 +44,7 @@ from services.orders import (
     create_order_with_items_service,
     update_order_patch_service,
     archive_order_service,
+    count_active_orders_by_status_service,
 )
 
 
@@ -107,6 +110,31 @@ def create_order_with_items(
         db_customer=db_customer,
         db_items=db_items
     )
+
+
+@router.get(
+    "/summary/status-counts",
+    response_model=list[OrderStatusCountPublic],
+)
+def get_order_status_counts(
+    session: Session = Depends(get_session),
+) -> list[OrderStatusCountPublic]:
+    
+    counts = count_active_orders_by_status_service(                                
+        session=session,
+    )
+
+    response: list[OrderStatusCountPublic] = []
+
+    for status_value, order_count in counts:
+        response.append(
+            OrderStatusCountPublic(
+                status=status_value,
+                count=order_count,
+            )
+        )
+
+    return response
 
 
 @router.get("/{order_id}", 
@@ -201,7 +229,6 @@ def list_orders(
     return to_order_public_list(db_orders)
 
 
-
 @router.patch(
     "/{order_id}",
     response_model=OrderDetailPublic,
@@ -253,9 +280,6 @@ def patch_order(
         db_order=db_order,
         db_customer=db_customer,
     )
-
-
-
 
 
 @router.delete("/{order_id}", status_code=204)

@@ -3,6 +3,7 @@ import os
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
+from datetime import UTC, datetime
 
 import models  # keeps SQLModel metadata aware of tables
 from db import get_session
@@ -14,7 +15,8 @@ from services.items import create_item_service
 from models import (CustomerCreate, 
                     OrderCreate, 
                     OrderItemCreate, 
-                    ItemForOrderWithItemsCreate)
+                    ItemForOrderWithItemsCreate,
+                    Order)
 
 from typing import Literal
 
@@ -215,10 +217,35 @@ def make_db_order(db_session, db_customer):
                 customer_id=db_customer.id,
                 total_cents=total_cents,
                 status=status,
-            session=db_session,
+                session=db_session,
         )
 
     return _make_db_order
+
+
+@pytest.fixture
+def make_db_order_for_query(db_session, db_customer):
+    def _make_db_order(
+        total_cents: int,
+        status: Literal['paid', 'pending'],
+        archived_at: datetime | None = None,
+    ):
+        db_order= Order(
+            created_at=datetime.now(UTC),
+            customer_id=db_customer.id,
+            total_cents=total_cents,
+            status=status,
+            archived_at=archived_at
+        )
+
+        db_session.add(db_order)
+        db_session.commit()
+        db_session.refresh(db_order)
+
+        return db_order
+
+    return _make_db_order
+
 
 
 @pytest.fixture

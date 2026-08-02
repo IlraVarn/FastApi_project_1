@@ -8,6 +8,8 @@ class AppError(Exception):
         super().__init__(self.detail)
 
 
+
+
 class DataIntegrityError(AppError):
     default_detail = "database integrity error"
 
@@ -26,10 +28,10 @@ class ItemNotFoundError(AppError):
 class ConflictError(AppError):
     default_detail = "conflict"
 
-    
-
 class InvalidOrderUpdateError(AppError):
     default_detail = "request is empty or supplies null"
 
 class InvalidOrderStateTransitionError(AppError):
     default_detail = "requested change conflicts with the order's current state"
+
+

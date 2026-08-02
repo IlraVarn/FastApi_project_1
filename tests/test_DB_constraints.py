@@ -60,7 +60,7 @@ def test_order_customer_id_foreign_key_constraint(db_session):
     db_session.rollback()
 
 
-def test_order_total_cents_positive_constraint(db_session, db_customer):
+def test_order_total_cents_non_negative_constraint(db_session, db_customer):
     db_order = Order(
         customer_id=db_customer.id,
         created_at=datetime.now(UTC),
@@ -124,3 +124,21 @@ def test_order_item_quantity_positive_constraint(db_session, db_order):
         db_session.commit()
 
     db_session.rollback()
+
+
+def test_order_item_product_name_non_empty_constraint(db_session, db_order):
+    db_item = OrderItem(
+        order_id=db_order.id,
+        product_name="",
+        quantity=0,
+        unit_price_cents=50,
+    )
+
+    db_session.add(db_item)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+    db_session.rollback()
+
+

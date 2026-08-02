@@ -212,3 +212,5 @@ def test_get_customer_with_orders_service_customer_not_found(
         999, db_session)
 
     assert captured_error.value.detail == "customer not found"
+
+

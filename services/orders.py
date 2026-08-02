@@ -23,6 +23,7 @@ from storage.orders import (add_order_record,
                             update_order_patch,
                             get_order_by_id_include_archived,
                             archive_order_record,
+                            count_active_orders_by_status,
                             )
 from storage.items import list_items_by_order_id, create_item_record
 
@@ -58,6 +59,76 @@ def create_order_service(
     session.refresh(db_order)
 
     return db_order
+
+
+def create_order_with_items_service(
+    *,
+    customer_id: int,
+    status: OrderStatus,
+    items: list[ItemForOrderWithItemsCreate],
+    session: Session,
+) -> tuple[Order, Customer, list[OrderItem]]:
+    
+    db_customer = get_customer_by_id(
+        customer_id=customer_id,
+        session=session,
+    )
+
+    if db_customer is None:
+        raise CustomerNotFoundError()
+
+    total_cents = 0
+
+    for item in items:
+        total_cents += item.quantity * item.unit_price_cents
+
+    try:
+        db_order = add_order_record(
+            customer_id=customer_id,
+            total_cents=total_cents,
+            status=status,
+            session=session,
+        )
+
+        session.flush()
+
+        order_id = db_order.id
+
+        #the following defensive check catches the problem at the source. 
+        # Otherwise it surfaces at the end and loos like the items is the problem
+        if order_id is None:
+            session.rollback()
+            raise DataIntegrityError()
+
+        db_items: list[OrderItem] = []
+
+        for item in items:
+            db_item = create_item_record(
+                order_id=order_id,
+                product_name=item.product_name,
+                quantity=item.quantity,
+                unit_price_cents=item.unit_price_cents,
+                session=session,
+            )
+
+            db_items.append(db_item)
+
+        session.commit()
+
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+    except Exception:
+        session.rollback()
+        raise
+
+    #only reached on success
+    session.refresh(db_order)
+
+    for db_item in db_items:
+        session.refresh(db_item)
+
+    return db_order, db_customer, db_items
 
 
 def get_order_detail_service(
@@ -153,72 +224,6 @@ def list_active_orders_service(
 
 
     return db_orders
-
-
-def create_order_with_items_service(
-    *,
-    customer_id: int,
-    status: OrderStatus,
-    items: list[ItemForOrderWithItemsCreate],
-    session: Session,
-) -> tuple[Order, Customer, list[OrderItem]]:
-    
-    db_customer = get_customer_by_id(
-        customer_id=customer_id,
-        session=session,
-    )
-
-    if db_customer is None:
-        raise CustomerNotFoundError()
-
-    total_cents = 0
-
-    for item in items:
-        total_cents += item.quantity * item.unit_price_cents
-
-    try:
-        db_order = add_order_record(
-            customer_id=customer_id,
-            total_cents=total_cents,
-            status=status,
-            session=session,
-        )
-
-        session.flush()
-
-        order_id = db_order.id
-
-        #the following defensive check catches the problem at the source. 
-        # Otherwise it surfaces at the end and loos like the items is the problem
-        if order_id is None:
-            session.rollback()
-            raise DataIntegrityError()
-
-        db_items: list[OrderItem] = []
-
-        for item in items:
-            db_item = create_item_record(
-                order_id=order_id,
-                product_name=item.product_name,
-                quantity=item.quantity,
-                unit_price_cents=item.unit_price_cents,
-                session=session,
-            )
-
-            db_items.append(db_item)
-
-        session.commit()
-
-    except IntegrityError as error:
-        session.rollback()
-        raise DataIntegrityError() from error
-
-    session.refresh(db_order)
-
-    for db_item in db_items:
-        session.refresh(db_item)
-
-    return db_order, db_customer, db_items
 
 
 def update_order_patch_service(
@@ -338,5 +343,16 @@ def archive_order_service(
     except IntegrityError as error:
         session.rollback()
         raise DataIntegrityError() from error
+
+
+def count_active_orders_by_status_service(
+    *,
+    session: Session,
+) -> list[tuple[str, int]]:
+    """Return active order counts grouped by status."""
+
+    return count_active_orders_by_status(                  
+        session=session,
+    )
 
 

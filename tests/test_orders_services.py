@@ -1,5 +1,6 @@
 import pytest 
 from sqlmodel import select
+from datetime import UTC, datetime
 from errors import (ConflictError, 
                     ItemNotFoundError, 
                     OrderNotFoundError, 
@@ -22,7 +23,9 @@ from services.orders import (create_order_service,
                              update_order_service,
                              create_order_with_items_service,
                              update_order_patch_service,
-                             archive_order_service)
+                             archive_order_service,
+                             count_active_orders_by_status_service,
+                             )
 from services.items import create_item_service
 
 
@@ -475,5 +478,36 @@ def test_create_order_with_items_service_customer_not_found(db_session, db_custo
     )
         
     assert error.value.detail == 'customer not found'
+
+
+#QUERY TESTS
+
+# only selects active
+#none archived
+#empty db returns empty list
+
+def test_count_active_orders_service_success(db_session, make_db_order_for_query):
+
+    first_order = make_db_order_for_query(total_cents=10, status='paid', archived_at=None) 
+
+    second_order = make_db_order_for_query(total_cents=10, status='pending', archived_at=datetime.now(UTC)) 
+
+    third_order = make_db_order_for_query(total_cents=10, status='paid', archived_at=None) 
+
+    returned_counts = count_active_orders_by_status_service(
+        session=db_session)
+    
+    assert returned_counts == [('paid', 2)]
+
+
+
+def test_count_active_orders_service_returns_empty_list(db_session,):
+
+
+
+    returned_counts = count_active_orders_by_status_service(
+        session=db_session)
+    
+    assert returned_counts == []
 
 

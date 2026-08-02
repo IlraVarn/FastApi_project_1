@@ -8,7 +8,7 @@ from sqlalchemy import CheckConstraint
 
 #CUSTOMERS
 class Customer(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "customer"
+    __tablename__: ClassVar[str] = "customers"
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="ck_customer_name_non_empty"),
         CheckConstraint("length(trim(email)) > 0", name="ck_customer_email_non_empty"),
@@ -50,7 +50,7 @@ class CustomerPublic(SQLModel):
 
 #ORDERS
 class Order(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "order"
+    __tablename__: ClassVar[str] = "orders"
     __table_args__ = (
         CheckConstraint("customer_id > 0", name="ck_customer_id_positive"),
         CheckConstraint("total_cents >= 0", name="ck_total_cents_non_negative"),
@@ -61,10 +61,13 @@ class Order(SQLModel, table=True):
     created_at: datetime = Field(nullable=False)
     customer_id: int = Field(
         nullable=False, 
-        foreign_key='customer.id',
+        foreign_key='customers.id',
         index=True)
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
+
+    """archived_at controls lyfecycle state so nullable makes it excplicit. 
+    i.e. archived_at is None => active order. Not none => archived order"""
     archived_at: datetime | None = Field(default=None, nullable=True)
 
 
@@ -72,6 +75,7 @@ class OrderUpdatePatch(SQLModel):
     """ extra= forbid sends back 422 if clent sends additional field.
     rejects fields the client cannot mutate"""
     model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
+
     total_cents: int | None = Field(default=None, ge=0)
     status: OrderStatus | None = None
 
@@ -93,7 +97,12 @@ class OrderCreate(SQLModel):
             return value.strip().lower()
 
         return value
-    
+
+
+class OrderStatusCountPublic(SQLModel):
+    status: str
+    count: int
+
     
 class OrderWithItemsCreate(SQLModel):
     customer_id: int = Field(ge=1)
@@ -126,16 +135,17 @@ class OrderDetailWithItemsPublic(SQLModel):
 
 #ITEMS
 class OrderItem(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "order_item"
+    __tablename__: ClassVar[str] = "order_items"
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
         CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),
+        CheckConstraint("length(trim(product_name)) > 0", name="ck_product_name_non_empty"),
     )
 
     id: int | None = Field(default=None, primary_key=True)
     order_id: int = Field(
-        foreign_key="order.id", 
+        foreign_key="orders.id", 
         nullable=False,
         index=True)
     product_name: str = Field(nullable=False)
