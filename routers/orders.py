@@ -112,8 +112,7 @@ def create_order_with_items(
     )
 
 
-@router.get(
-    "/summary/status-counts",
+@router.get("/summary/status-counts",
     response_model=list[OrderStatusCountPublic],
 )
 def get_order_status_counts(
@@ -159,7 +158,7 @@ def read_order(
     return to_order_detail_public(db_order, db_customer)
 
 
-@router.get("/{order_id}/items", 
+@router.get("/{order_id}/detail", 
             response_model=OrderDetailWithItemsPublic)
 def read_order_with_items(
     order_id: int,
@@ -316,4 +315,5 @@ def archive_order(
     return Response(
         status_code=204,
     )
+
 

@@ -112,29 +112,6 @@ def list_orders_by_customer_id(
     return list(result.all())
 
 
-def list_order_customer_pairs(
-    session: Session,
-) -> list[tuple[Order, Customer]]:
-    """Return every order together with its referenced customer."""
-
-    statement = (
-        select(Order, Customer)
-        .join(
-            Customer,
-            col(Customer.id) == Order.customer_id,
-        )
-        .where(col(Order.archived_at).is_(None),)
-        .order_by(
-            desc(col(Order.created_at)),
-            desc(col(Order.id)),
-        )
-    )
-
-    result = session.exec(statement)
-
-    return list(result.all())
-
-
 def archive_order_record(
     *,
     db_order: Order,
@@ -224,4 +201,27 @@ def count_active_orders_by_status(
 
     return result
 
+
+#JOIN
+def list_order_customer_pairs(
+    session: Session,
+) -> list[tuple[Order, Customer]]:
+    """Return every order together with its referenced customer."""
+
+    statement = (
+        select(Order, Customer)
+        .join(
+            Customer,
+            col(Customer.id) == Order.customer_id,
+        )
+        .where(col(Order.archived_at).is_(None),)
+        .order_by(
+            desc(col(Order.created_at)),
+            desc(col(Order.id)),
+        )
+    )
+
+    result = session.exec(statement)
+
+    return list(result.all())
 

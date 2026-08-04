@@ -107,7 +107,7 @@ def test_get_order_with_items_success_returns_200(client, customer, order, item)
     customer_id = customer['id']
     item_id = item['id']
 
-    response = client.get(f'/orders/{order_id}/items')
+    response = client.get(f'/orders/{order_id}/detail')
     data = response.json()
     assert response.status_code == 200
 
@@ -353,7 +353,7 @@ def test_get_order_missing_returns_404(client):
 
 def test_get_order_with_items_missing_order_returns_404(client):
 
-    response = client.get("/orders/999/items")
+    response = client.get("/orders/999/detail")
     
     data = response.json()
 

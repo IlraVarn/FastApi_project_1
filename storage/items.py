@@ -84,3 +84,5 @@ def list_items_sorted(*,
     db_items = list(session.exec(statement).all())
 
     return db_items
+
+
