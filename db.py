@@ -7,7 +7,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///database.db",
+    "postgresql+psycopg://ilravarn@localhost:5432/fastapi_learning",
 )
 
 connect_args = {}

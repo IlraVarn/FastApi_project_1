@@ -187,12 +187,12 @@ def update_order_service(
     if db_customer is None:
         raise DataIntegrityError()
     
-    db_order = update_order(db_order=db_order, 
+    try:
+        db_order = update_order(db_order=db_order, 
                             total_cents=total_cents, 
                             status=status, 
                             session=session)
 
-    try:
         session.commit()
 
     except IntegrityError as error:
@@ -251,7 +251,7 @@ def update_order_patch_service(
 
     if db_order is None:
         raise OrderNotFoundError()
-
+    
     db_customer = get_customer_by_id(
         customer_id=db_order.customer_id,
         session=session,

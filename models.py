@@ -3,20 +3,21 @@ from sqlmodel import Field, SQLModel, Relationship
 from pydantic import field_validator, EmailStr, ConfigDict
 from datetime import datetime, UTC
 from typing import Literal, ClassVar
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 
 
 #CUSTOMERS
 class Customer(SQLModel, table=True):
     __tablename__: ClassVar[str] = "customers"
     __table_args__ = (
+        UniqueConstraint("email", name="uq_customers_email",),
         CheckConstraint("length(trim(name)) > 0", name="ck_customer_name_non_empty"),
         CheckConstraint("length(trim(email)) > 0", name="ck_customer_email_non_empty"),
         )
     
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
-    email: str = Field(nullable=False, index=True, unique=True)
+    email: str = Field(nullable=False, index=True)
     internal_note: str | None = None
 
     

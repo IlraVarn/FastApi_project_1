@@ -2,7 +2,6 @@ import pytest
 import os
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
 from datetime import UTC, datetime
 
 import models  # keeps SQLModel metadata aware of tables
@@ -20,34 +19,18 @@ from models import (CustomerCreate,
 
 from typing import Literal
 
-from sqlalchemy import event
-
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "sqlite://",
+    "postgresql+psycopg://ilravarn@localhost:5432/fastapi_learning_test",
 )
 
-
-if TEST_DATABASE_URL.startswith("sqlite"):
-    test_engine = create_engine(
-        TEST_DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+if not TEST_DATABASE_URL.endswith("/fastapi_learning_test"):
+    raise RuntimeError(
+        "Tests must run against fastapi_learning_test"
     )
 
-    @event.listens_for(test_engine, "connect")
-    def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-else:
-    assert "test" in TEST_DATABASE_URL
-
-    test_engine = create_engine(
-        TEST_DATABASE_URL,
-    )
-
+test_engine = create_engine(TEST_DATABASE_URL)
 
 def override_get_session():
     with Session(test_engine) as session:
