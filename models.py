@@ -70,6 +70,8 @@ class Order(SQLModel, table=True):
     """archived_at controls lyfecycle state so nullable makes it excplicit. 
     i.e. archived_at is None => active order. Not none => archived order"""
     archived_at: datetime | None = Field(default=None, nullable=True)
+    
+    reference: str | None = Field(default=None, nullable=True)
 
 
 class OrderUpdatePatch(SQLModel):
