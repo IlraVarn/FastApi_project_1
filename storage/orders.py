@@ -16,7 +16,6 @@ def add_order_record(
     ) -> Order:
     
     db_order = Order(
-        created_at=datetime.now(UTC),
         customer_id=customer_id,
         total_cents=total_cents,
         status=status,
@@ -159,6 +158,7 @@ def update_order_patch(
     """
 
     db_order.sqlmodel_update(update_data)
+    db_order.updated_at= datetime.now(UTC)
     session.add(db_order)
 
     return db_order

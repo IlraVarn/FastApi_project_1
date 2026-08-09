@@ -49,6 +49,14 @@ def create_customer_service(
 
     except IntegrityError as error:
         session.rollback()
+
+        diagnostic = getattr(error.orig, "diag", None)
+
+        constraint_name = getattr(diagnostic, "constraint_name", None,)
+
+        if constraint_name == "uq_customers_email":
+            raise DuplicateCustomerEmailError() from error
+
         raise DataIntegrityError() from error
 
     session.refresh(db_customer)

@@ -3,7 +3,7 @@ from sqlmodel import Field, SQLModel, Relationship
 from pydantic import field_validator, EmailStr, ConfigDict
 from datetime import datetime, UTC
 from typing import Literal, ClassVar
-from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
 
 
 #CUSTOMERS
@@ -59,18 +59,28 @@ class Order(SQLModel, table=True):
         )
     
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False)
+    )
     customer_id: int = Field(
         nullable=False, 
         foreign_key='customers.id',
         index=True)
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
-
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+        ),
+    )
     """archived_at controls lyfecycle state so nullable makes it excplicit. 
     i.e. archived_at is None => active order. Not none => archived order"""
     archived_at: datetime | None = Field(default=None, nullable=True)
-    
     reference: str | None = Field(default=None, nullable=True)
 
 
