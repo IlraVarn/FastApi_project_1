@@ -1,3 +1,4 @@
+
 #success tests
 def test_create_order_success_returns_201(client, customer,):
 
@@ -17,6 +18,8 @@ def test_create_order_success_returns_201(client, customer,):
     assert data["created_at"] is not None
     assert data["customer_id"] == customer['id']
     assert data["total_cents"] == 10
+    assert 'updated_at' not in data
+    assert 'archived_at' not in data
 
 
 def test_create_order_with_items_success_returns_201(client, customer,):
@@ -57,6 +60,7 @@ def test_create_order_with_items_success_returns_201(client, customer,):
     assert returned_item_data['order_id'] == data['id']
     assert returned_item_data['id'] is not None
     assert 'status' not in data
+    assert 'updated_at' not in data
 
 
 def test_get_order_success_returns_200(client, customer, order):
@@ -72,6 +76,7 @@ def test_get_order_success_returns_200(client, customer, order):
     assert data['total_cents'] == order['total_cents']
     assert data['status'] == 'paid'
     assert 'customer_id' not in data
+    assert 'updated_at' not in data
 
     assert data['customer']['id'] == order['customer_id']
     assert data['customer']['name'] == customer['name']
@@ -115,6 +120,7 @@ def test_get_order_with_items_success_returns_200(client, customer, order, item)
     assert data['created_at'] is not None
     assert data['total_cents'] == 10
     assert 'customer_id' not in data
+    assert 'updated_at' not in data
     
     assert data['customer']['id'] == customer_id
     assert data['customer']['name'] == customer['name']
@@ -152,6 +158,7 @@ def test_list_orders_filter_by_status_success_returns_200(client, make_order):
     assert data[0]['customer_id'] == paid_order['customer_id']
     assert data[0]['total_cents'] == paid_order['total_cents']
     assert 'status' not in data[0]
+    assert 'updated_at' not in data
 
 
 def test_list_orders_sort_by_total_cents_ascending_success_returns_200(client, make_order):

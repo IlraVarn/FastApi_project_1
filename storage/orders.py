@@ -14,7 +14,13 @@ def add_order_record(
     status: str,
     session: Session,
     ) -> Order:
-    
+
+    """Create and stage a new Order for persistence.
+
+    Order model defaults initialize created_at and updated_at.
+    Does not commit, rollback, or refresh.
+    """
+      
     db_order = Order(
         customer_id=customer_id,
         total_cents=total_cents,
@@ -114,15 +120,19 @@ def list_orders_by_customer_id(
 def archive_order_record(
     *,
     db_order: Order,
-    archived_at: datetime,
     session: Session,
 ) -> Order:
+    
     """Set an Order's archive timestamp and stage it for persistence.
 
     Does not commit, rollback, refresh, or decide whether archiving is allowed.
     """
 
-    db_order.archived_at = archived_at
+    now = datetime.now(UTC)
+
+    db_order.archived_at = now
+    db_order.updated_at = now
+
     session.add(db_order)
 
     return db_order
@@ -152,8 +162,10 @@ def update_order_patch(
     update_data: dict[str, Any],
     session: Session,
 ) -> Order:
-    """Apply validated fields to an existing Order 
+    """Apply validated fields to an existing Order,
+    set updated_at to the current UTC time,
     and stage it for persistence.
+
     Does not commit, rollback, or refresh.
     """
 

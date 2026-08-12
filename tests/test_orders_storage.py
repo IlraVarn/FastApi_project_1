@@ -6,6 +6,7 @@ from services.orders import create_order_service
 from storage.orders import list_order_customer_pairs
 
 
+#JOIN test
 def test_list_order_customer_pairs_returns_matching_pairs(
     db_session,
     make_db_customer,

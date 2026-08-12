@@ -329,12 +329,10 @@ def archive_order_service(
     if db_order.status == 'pending':
         raise InvalidOrderStateTransitionError()
     
-    archived_at = datetime.now(UTC)
 
     try:
         archive_order_record(
             db_order=db_order,
-            archived_at=archived_at,
             session=session,
         )
 

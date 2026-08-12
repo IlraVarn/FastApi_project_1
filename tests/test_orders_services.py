@@ -43,6 +43,9 @@ def test_create_order_service_success(db_session, db_customer):
     assert db_order.customer_id == db_customer.id
     assert db_order.total_cents == 10
     assert db_order.status == 'paid'
+    assert db_order.updated_at is not None
+    assert db_order.created_at.tzinfo is not None
+    assert db_order.updated_at.tzinfo is not None
 
 
 def test_create_order_service_customer_not_found(db_session):
@@ -67,6 +70,7 @@ def test_get_order_detail_service_success(db_session, db_customer, db_order):
 
     assert returned_order.id == db_order.id
     assert returned_order.created_at is not None
+    assert returned_order.updated_at is not None
     assert returned_order.customer_id == db_customer.id
     assert returned_order.total_cents == db_order.total_cents
     assert returned_order.status == db_order.status
@@ -312,6 +316,7 @@ def test_update_order_patch_service_updates_only_supplied_field(db_session, make
         total_cents=5000,
         status="pending",
     )
+    old_updated_at = db_order.updated_at
 
     update_data = {'status':'paid'}
 
@@ -324,6 +329,8 @@ def test_update_order_patch_service_updates_only_supplied_field(db_session, make
     #ommitted field remains unchanged
     assert returned_order.status == "paid"
     assert returned_order.total_cents == 5000
+
+    assert returned_order.updated_at > old_updated_at
 
 
 def test_update_order_patch_service_rejects_empty_update(
@@ -376,11 +383,14 @@ def test_archive_order_service_success(db_session, make_db_order):
 
     db_order = make_db_order(total_cents=5000, status='paid')
     assert db_order.archived_at is None
+    old_updated_at = db_order.updated_at
 
     archive_order_service(order_id=db_order.id, session=db_session)
     db_session.refresh(db_order)
 
     assert db_order.archived_at is not None
+    assert db_order.updated_at > old_updated_at
+    assert db_order.updated_at == db_order.archived_at
 
 
 def test_archive_order_service_is_idempotent(db_session, make_db_order):
@@ -502,8 +512,6 @@ def test_count_active_orders_service_success(db_session, make_db_order_for_query
 
 
 def test_count_active_orders_service_returns_empty_list(db_session,):
-
-
 
     returned_counts = count_active_orders_by_status_service(
         session=db_session)
