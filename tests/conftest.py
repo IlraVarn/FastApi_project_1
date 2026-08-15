@@ -1,5 +1,6 @@
 import pytest
 import os
+
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from datetime import UTC, datetime
@@ -15,10 +16,12 @@ from models import (CustomerCreate,
                     OrderCreate, 
                     OrderItemCreate, 
                     ItemForOrderWithItemsCreate,
-                    Order)
+                    Order,
+                    User)
 
 from typing import Literal
 
+os.environ["DEV_AUTH_TOKEN"] = "test-token"
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -36,6 +39,11 @@ def override_get_session():
     with Session(test_engine) as session:
         yield session
 
+@pytest.fixture
+def auth_headers():
+    return {
+        "Authorization": "Bearer test-token"
+    } 
 
 @pytest.fixture(autouse=True)
 def reset_test_database():
@@ -84,7 +92,7 @@ def make_customer(client):
             json={
                 "name": name,
                 "email": email,
-            }
+            },
         )
         assert response.status_code == 201
         return response.json()
@@ -101,6 +109,9 @@ def order(client, customer):
             'total_cents': 10,
             'status': 'paid'
         },
+        headers={
+            "Authorization": "Bearer abc123"
+        },
     )
 
     assert response.status_code == 201
@@ -116,6 +127,9 @@ def make_order(client, customer):
                 "total_cents": total_cents,
                 "status": status,
             },
+            headers={
+            "Authorization": "Bearer abc123"
+        },
         )
 
         assert response.status_code == 201
@@ -182,22 +196,34 @@ def make_db_customer(db_session):
     return _make_db_customer
 
 @pytest.fixture
-def db_order(db_session, db_customer):
+def db_user(db_session):
+    user = User(
+        email="test@example.com"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+@pytest.fixture
+def db_order(db_session, db_customer, db_user):
     return create_order_service(
             customer_id=db_customer.id,
+            owner_id=db_user.id,
             total_cents=10,
             status="paid",
-        session=db_session,
+            session=db_session,
     )
 
 @pytest.fixture
-def make_db_order(db_session, db_customer):
+def make_db_order(db_session, db_customer, db_user):
     def _make_db_order(
         total_cents: int,
         status: Literal['paid', 'pending'],
     ):
         return create_order_service(
                 customer_id=db_customer.id,
+                owner_id=db_user.id,
                 total_cents=total_cents,
                 status=status,
                 session=db_session,
@@ -207,7 +233,7 @@ def make_db_order(db_session, db_customer):
 
 
 @pytest.fixture
-def make_db_order_for_query(db_session, db_customer):
+def make_db_order_for_query(db_session, db_customer, db_user):
     def _make_db_order(
         total_cents: int,
         status: Literal['paid', 'pending'],
@@ -216,6 +242,7 @@ def make_db_order_for_query(db_session, db_customer):
         db_order= Order(
             created_at=datetime.now(UTC),
             customer_id=db_customer.id,
+            owner_id=db_user.id,
             total_cents=total_cents,
             status=status,
             archived_at=archived_at

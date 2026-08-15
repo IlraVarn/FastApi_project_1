@@ -10,6 +10,7 @@ from typing import Any
 
 def add_order_record(
     customer_id: int,
+    owner_id: int,
     total_cents: int,
     status: str,
     session: Session,
@@ -23,6 +24,7 @@ def add_order_record(
       
     db_order = Order(
         customer_id=customer_id,
+        owner_id=owner_id,
         total_cents=total_cents,
         status=status,
     )

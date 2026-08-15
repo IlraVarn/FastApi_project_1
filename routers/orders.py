@@ -1,4 +1,5 @@
 from typing import Annotated, Literal
+from auth.dependencies import AuthContext, get_current_user
 
 from fastapi import (APIRouter, 
                      Depends, 
@@ -55,12 +56,14 @@ router = APIRouter(prefix="/orders", tags=["orders"])
              response_model=OrderPublic, status_code=201)
 def create_order(
     order: OrderCreate,
+    current_user: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-
+    print(current_user.user_id, flush=True)
     try:
         db_order = create_order_service(
             customer_id=order.customer_id,
+            owner_id=current_user.user_id,
             total_cents=order.total_cents,
             status=order.status,
             session=session,
@@ -82,12 +85,14 @@ def create_order(
 )
 def create_order_with_items(
     order: OrderWithItemsCreate,
+    current_user: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> OrderDetailWithItemsPublic:
     
     try:
         db_order, db_customer, db_items = create_order_with_items_service(
             customer_id=order.customer_id,
+            owner_id=current_user.user_id,
             status=order.status,
             items=order.items,
             session=session,

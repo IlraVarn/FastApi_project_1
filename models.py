@@ -6,24 +6,19 @@ from typing import Literal, ClassVar
 from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
 
 
-#CUSTOMERS
-class Customer(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "customers"
+#ORGANIZATIONS
+class Organization(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "organizations"
     __table_args__ = (
-        UniqueConstraint("email", name="uq_customers_email",),
-        CheckConstraint("length(trim(name)) > 0", name="ck_customer_name_non_empty"),
-        CheckConstraint("length(trim(email)) > 0", name="ck_customer_email_non_empty"),
+        CheckConstraint("length(trim(name)) > 0", name="ck_organization_name_non_empty"),
         )
     
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
-    email: str = Field(nullable=False, index=True)
-    internal_note: str | None = None
 
-    
-class CustomerCreate(SQLModel):
+
+class OrganizationCreate(SQLModel):
     name: str = Field(min_length=1)
-    email: EmailStr
 
     @field_validator("name")
     @classmethod
@@ -35,7 +30,54 @@ class CustomerCreate(SQLModel):
 
         return value
     
-    @field_validator("email")
+
+class OrganizationPublic(SQLModel):
+    id: int
+    name: str
+
+
+
+#USERS
+class User(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "users"
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_users_email",),
+        CheckConstraint("length(trim(name)) > 0", name="ck_user_name_non_empty"),
+        CheckConstraint("length(trim(email)) > 0", name="ck_user_email_non_empty"),
+        )
+    
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False)
+    email: str = Field(nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False)
+    )
+    archived_at: datetime | None = Field(
+        default=None, 
+        sa_column=Column(
+            DateTime(timezone=True),
+        nullable=True)
+    )
+
+
+class UserCreate(SQLModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_reject_blank(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("must not be blank")
+
+        return value
+    
+    @field_validator("email", mode="before")
     @classmethod
     def strip_lower(cls, value: str) -> str:
         value = value.strip().lower()
@@ -43,20 +85,54 @@ class CustomerCreate(SQLModel):
         return value
 
 
-class CustomerPublic(SQLModel):
+class UserPublic(SQLModel):
     id: int
     name: str
     email: str
 
 
+
+#MEMBERSHIPS
+class Membership(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "memberships"
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'inactive')", name="ck_membership_status_valid"),
+        UniqueConstraint("user_id", "organization_id", name="uq_memberships_user_organization",)
+        )
+    
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(nullable=False, foreign_key='users.id', index=True)
+    organization_id: int = Field(nullable=False, foreign_key='organizations.id', index=True)
+    status: str = Field(default='active', nullable=False)
+
+
+class MembershipCreate(SQLModel):
+    user_id: int = Field(ge=1)
+
+    @field_validator("status", mode='before')
+    @classmethod
+    def normalize_status(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower()
+
+        return value
+    
+
+class MembershipPublic(SQLModel):
+    id: int
+    user_id: int
+    organization_id: int
+    status: Literal["active", "inactive"]
+
+    
+
 #ORDERS
 class Order(SQLModel, table=True):
     __tablename__: ClassVar[str] = "orders"
     __table_args__ = (
-        CheckConstraint("customer_id > 0", name="ck_customer_id_positive"),
-        CheckConstraint("total_cents >= 0", name="ck_total_cents_non_negative"),
+        CheckConstraint("total_cents >= 0", name="ck_order_total_cents_non_negative"),
         CheckConstraint("status IN ('paid', 'pending')", name="ck_order_status_valid"),
-        )
+    )
     
     id: int | None = Field(default=None, primary_key=True)
     created_at: datetime = Field(
@@ -65,10 +141,11 @@ class Order(SQLModel, table=True):
             DateTime(timezone=True),
             nullable=False)
     )
-    customer_id: int = Field(
+    organization_id: int = Field(
         nullable=False, 
-        foreign_key='customers.id',
+        foreign_key='organizations.id',
         index=True)
+    
     total_cents: int = Field(nullable=False)
     status: str = Field(nullable=False)
     updated_at: datetime = Field(
@@ -78,8 +155,8 @@ class Order(SQLModel, table=True):
             nullable=False,
         ),
     )
-    """archived_at controls lyfecycle state so nullable makes it excplicit. 
-    i.e. archived_at is None => active order. Not none => archived order"""
+    #archived_at controls lyfecycle state so nullable makes it excplicit. 
+    #i.e. archived_at is None => active order. Not none => archived order
     archived_at: datetime | None = Field(
         default=None, 
         sa_column=Column(
@@ -227,13 +304,9 @@ class OrderSummaryPerCustomerPublic(SQLModel):
     status: str
 
 
+MembershipStatus = Literal["active", "inactive"]
 
 
-
-#CUSTOMERS SORT
-
-CustomerSortBy = Literal["id", "name", "email"]
-CustomerSortDirection = Literal["asc", "desc"]
 
 
 #ORDERS SORT

@@ -30,6 +30,7 @@ from storage.items import list_items_by_order_id, create_item_record
 
 def create_order_service(
     customer_id: int,
+    owner_id: int,
     total_cents: int,
     status: str,
     session: Session,
@@ -44,6 +45,7 @@ def create_order_service(
     try:
         db_order = add_order_record(
             customer_id=customer_id,
+            owner_id=owner_id,
             total_cents=total_cents,
             status=status,
             session=session,
@@ -64,6 +66,7 @@ def create_order_service(
 def create_order_with_items_service(
     *,
     customer_id: int,
+    owner_id: int,
     status: OrderStatus,
     items: list[ItemForOrderWithItemsCreate],
     session: Session,
@@ -85,6 +88,7 @@ def create_order_with_items_service(
     try:
         db_order = add_order_record(
             customer_id=customer_id,
+            owner_id=owner_id,
             total_cents=total_cents,
             status=status,
             session=session,
