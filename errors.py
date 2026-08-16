@@ -35,3 +35,11 @@ class InvalidOrderStateTransitionError(AppError):
     default_detail = "requested change conflicts with the order's current state"
 
 
+class UserNotFoundError(AppError):
+    default_detail = "user not found"
+
+
+# application/domain error. It does not know anything about HTTP.
+class TenantAccessDeniedError(Exception):
+    pass
+

@@ -63,27 +63,6 @@ class User(SQLModel, table=True):
     )
 
 
-class UserCreate(SQLModel):
-    name: str = Field(min_length=1)
-    email: EmailStr
-
-    @field_validator("name", mode="before")
-    @classmethod
-    def strip_and_reject_blank(cls, value: str) -> str:
-        value = value.strip()
-
-        if not value:
-            raise ValueError("must not be blank")
-
-        return value
-    
-    @field_validator("email", mode="before")
-    @classmethod
-    def strip_lower(cls, value: str) -> str:
-        value = value.strip().lower()
-
-        return value
-
 
 class UserPublic(SQLModel):
     id: int
@@ -96,27 +75,18 @@ class UserPublic(SQLModel):
 class Membership(SQLModel, table=True):
     __tablename__: ClassVar[str] = "memberships"
     __table_args__ = (
+        UniqueConstraint("user_id", "organization_id", name="uq_memberships_user_organization",),
         CheckConstraint("status IN ('active', 'inactive')", name="ck_membership_status_valid"),
-        UniqueConstraint("user_id", "organization_id", name="uq_memberships_user_organization",)
+        CheckConstraint("role IN ('admin', 'member')",name="ck_membership_role_valid",)
         )
     
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(nullable=False, foreign_key='users.id', index=True)
     organization_id: int = Field(nullable=False, foreign_key='organizations.id', index=True)
     status: str = Field(default='active', nullable=False)
+    role: str = Field(default="member",nullable=False)
 
 
-class MembershipCreate(SQLModel):
-    user_id: int = Field(ge=1)
-
-    @field_validator("status", mode='before')
-    @classmethod
-    def normalize_status(cls, value):
-        if isinstance(value, str):
-            return value.strip().lower()
-
-        return value
-    
 
 class MembershipPublic(SQLModel):
     id: int
@@ -208,7 +178,6 @@ class OrderWithItemsCreate(SQLModel):
 class OrderPublic(SQLModel):
     id: int
     created_at: datetime
-    customer_id: int
     total_cents: int
     
 
