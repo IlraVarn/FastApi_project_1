@@ -47,10 +47,10 @@ def get_current_user(
 
     db_user = session.get(User, dev_user_id)
 
-    if db_user is None:
+    if db_user is None or db_user.archived_at is not None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="DEV authenticated user does not exist",
+            detail="Invalid authentication credentials",
         )
 
     if db_user.id is None:

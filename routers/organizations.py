@@ -41,7 +41,7 @@ from models import (
      OrganizationPublic
      )
 from services.organizations import create_self_service_organization_service
-router = APIRouter(prefix="/organizations/", tags=["organizations"])
+router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
 @router.post(
@@ -49,6 +49,7 @@ router = APIRouter(prefix="/organizations/", tags=["organizations"])
     response_model=OrganizationPublic,
     status_code=status.HTTP_201_CREATED,
 )
+
 def create_organization(
     organization: OrganizationCreate,
     current_user: AuthContext = Depends(get_current_user),
@@ -63,3 +64,5 @@ def create_organization(
     return to_organization_public(
         db_organization
     )
+
+

@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 from sqlmodel import SQLModel
 
-from models import Customer, Order, OrderItem
+import models
 import os
 
 

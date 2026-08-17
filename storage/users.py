@@ -3,17 +3,24 @@ from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc
 from models import User
 
+#DEV ONLY
+def add_user_record(
+    *,
+    name: str,
+    email: str,
+    session: Session,
+) -> User:
+    """dev only for self serve onboarding"""
 
+    db_user = User(
+        name=name,
+        email=email,
+    )
 
+    session.add(db_user)
 
-# def get_customer_by_email(
-#     *,
-#     email: str,
-#     session: Session,
-# ) -> Customer | None:
-    
-#     statement = select(Customer).where(Customer.email == email)
-#     return session.exec(statement).first()
+    return db_user
+
 
 
 def get_user_by_id(
@@ -23,3 +30,5 @@ def get_user_by_id(
 ) -> User | None:
     
     return session.get(User, user_id)
+
+

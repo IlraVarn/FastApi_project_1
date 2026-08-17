@@ -36,7 +36,6 @@ class OrganizationPublic(SQLModel):
     name: str
 
 
-
 #USERS
 class User(SQLModel, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -70,7 +69,6 @@ class UserPublic(SQLModel):
     email: str
 
 
-
 #MEMBERSHIPS
 class Membership(SQLModel, table=True):
     __tablename__: ClassVar[str] = "memberships"
@@ -85,7 +83,6 @@ class Membership(SQLModel, table=True):
     organization_id: int = Field(nullable=False, foreign_key='organizations.id', index=True)
     status: str = Field(default='active', nullable=False)
     role: str = Field(default="member",nullable=False)
-
 
 
 class MembershipPublic(SQLModel):
