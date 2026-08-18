@@ -40,3 +40,4 @@ def add_membership_record(
     session.add(db_membership)
 
     return db_membership
+

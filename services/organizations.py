@@ -1,20 +1,9 @@
-from datetime import UTC, datetime
+
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
-from auth.context import TenantContext
-from errors import (CustomerNotFoundError, 
-                    OrderNotFoundError, 
-                    DataIntegrityError, 
-                    ConflictError,
-                    InvalidOrderStateTransitionError,
-                    InvalidOrderUpdateError,
+from errors import (DataIntegrityError, 
                     UserNotFoundError)
-from models import (Order, OrderCreate, OrderItem, OrderUpdate, 
-                    OrderSortDirection, OrderSortBy, OrderStatus,
-                    ItemForOrderWithItemsCreate,
-                    OrderUpdatePatch,
-                    OrganizationPublic, OrganizationCreate, Organization)
-from typing import Literal, Any
+from models import (Organization)
 from sqlalchemy import asc, desc
 from storage.users import get_user_by_id
 from storage.orders import (add_order_record, )
@@ -34,7 +23,7 @@ from storage.organizations import add_organization_record
 
 def create_self_service_organization_service(
     *,
-    name: str,
+    organization_name: str,
     actor_user_id: int,
     session: Session,
 ) -> Organization:
@@ -49,7 +38,7 @@ def create_self_service_organization_service(
 
     try:
         db_organization = add_organization_record(
-            name=name,
+            organization_name=organization_name,
             session=session,
         )
 
@@ -79,3 +68,5 @@ def create_self_service_organization_service(
     session.refresh(db_organization)
 
     return db_organization
+
+

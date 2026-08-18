@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
-from auth.dependencies import AuthContext, get_current_user
-from auth.context import TenantContext
-from auth.dependencies import get_tenant_context
+from auth.dependencies import AuthContext, get_authenticated_user
+from tenancy.context import TenantContext
+from tenancy.dependencies import get_tenant_context
 from fastapi import (APIRouter, 
                      Depends, 
                      HTTPException, 

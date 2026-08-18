@@ -5,11 +5,11 @@ from models import Organization
 
 def add_organization_record(
     *,
-    name: str,
+    organization_name: str,
     session: Session,
 ) -> Organization:
     db_organization = Organization(
-        name=name,
+        name=organization_name,
     )
 
     session.add(db_organization)

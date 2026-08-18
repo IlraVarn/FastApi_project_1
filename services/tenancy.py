@@ -1,6 +1,6 @@
 from sqlmodel import Session
 
-from auth.context import TenantContext
+from tenancy.context import TenantContext
 from errors import TenantAccessDeniedError
 from storage.memberships import get_active_membership_record
 
