@@ -1,7 +1,6 @@
 from models import (
                     Order, 
-                    OrderPublic, 
-                    OrderDetailPublic,
+                    OrderPublic,
                     OrderItem, 
                     OrderItemPublic, 
                     OrderDetailWithItemsPublic,
@@ -38,6 +37,7 @@ def to_order_public(db_order: Order) -> OrderPublic:
         id= db_order.id,
         created_at= db_order.created_at,
         total_cents= db_order.total_cents,
+        status=db_order.status
     )
 
 def to_organization_public(db_organization: Organization) -> OrganizationPublic:

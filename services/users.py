@@ -13,18 +13,22 @@ def create_user_service(
     session: Session,
 ) -> User:
 
-    db_user = add_user_record(
-        name=name,
-        email=email,
-        session=session,
-    )
-
     try:
+        db_user = add_user_record(
+            name=name,
+            email=email,
+            session=session,
+        )
+
         session.commit()
 
     except IntegrityError as error:
         session.rollback()
         raise DataIntegrityError() from error
+
+    except Exception:
+        session.rollback()
+        raise
 
     session.refresh(db_user)
 

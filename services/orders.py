@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
-from auth.context import TenantContext
+from tenancy.context import TenantContext
 from errors import (CustomerNotFoundError, 
                     OrderNotFoundError, 
                     DataIntegrityError, 
@@ -14,9 +14,10 @@ from models import (Order, OrderCreate, OrderItem, OrderUpdate,
                     OrderUpdatePatch)
 from typing import Literal, Any
 from sqlalchemy import asc, desc
-from storage.orders import (add_order_record, )
+from storage.orders import (add_order_record, 
+                            get_active_order_by_id,
+                            )
 
-                            # get_active_order_by_id, 
                             # update_order,
                             # list_active_orders,
                             # list_orders_by_customer_id,
@@ -49,46 +50,31 @@ def create_order_service(
     except IntegrityError as error:
         session.rollback()
         raise DataIntegrityError() from error
+    
+    except Exception:
+        session.rollback()
+        raise
 
     session.refresh(db_order)
 
     return db_order
 
 
-
-# def create_order_servicee(
-#     customer_id: int,
-#     owner_id: int,
-#     total_cents: int,
-#     status: str,
-#     session: Session,
-# ) -> Order:
+def get_order_service(*,
+    tenant: TenantContext,
+    order_id: int,
+    session: Session,
+) -> Order:
     
-#     db_customer = get_customer_by_id(customer_id=customer_id, 
-#                                      session=session)
+    db_order = get_active_order_by_id(
+        order_id=order_id, 
+        organization_id=tenant.organization_id,
+        session=session)
 
-#     if db_customer is None:
-#         raise CustomerNotFoundError()
-    
-#     try:
-#         db_order = add_order_record(
-#             customer_id=customer_id,
-#             owner_id=owner_id,
-#             total_cents=total_cents,
-#             status=status,
-#             session=session,
-#             )
+    if db_order is None:
+        raise OrderNotFoundError()
 
-#         session.commit()
-
-#     except IntegrityError as error:
-#         session.rollback()
-#         print(error)
-#         raise DataIntegrityError() from error
-    
-#     session.refresh(db_order)
-
-#     return db_order
+    return db_order
 
 
 # def create_order_with_items_service(
@@ -163,25 +149,6 @@ def create_order_service(
 #     return db_order, db_customer, db_items
 
 
-# def get_order_detail_service(
-#     order_id: int,
-#     session: Session,
-# ) -> tuple[Order, Customer]:
-    
-#     db_order = get_active_order_by_id(
-#         order_id=order_id, 
-#         session=session)
-
-#     if db_order is None:
-#         raise OrderNotFoundError()
-
-#     db_customer = get_customer_by_id(customer_id=db_order.customer_id, 
-#                                      session=session)
-
-#     if db_customer is None:
-#         raise DataIntegrityError()
-
-#     return db_order, db_customer
 
 
 # def get_order_detail_with_items_service(

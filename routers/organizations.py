@@ -27,8 +27,6 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
 
-
-
 @router.post(
     "",
     response_model=OrganizationPublic,

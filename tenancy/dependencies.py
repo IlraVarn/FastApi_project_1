@@ -18,7 +18,7 @@ def get_tenant_context(
 ) -> TenantContext:
     
     try:
-        return resolve_tenant_context_service(
+        authorized_tenant =  resolve_tenant_context_service(
             actor_user_id=authenticated_user.user_id,
             organization_id=organization_id,
             session=session,
@@ -29,6 +29,11 @@ def get_tenant_context(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access to this organization is not allowed",
         ) from error
+
+
+    return authorized_tenant
+
+
 
 
 

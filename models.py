@@ -176,6 +176,7 @@ class OrderPublic(SQLModel):
     id: int
     created_at: datetime
     total_cents: int
+    status: str
     
 
 class OrderDetailPublic(SQLModel):

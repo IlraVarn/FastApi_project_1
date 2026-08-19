@@ -28,7 +28,6 @@ from mappers import (
 from models import (
     OrderCreate,
     OrderPublic,
-    OrderDetailPublic,
     OrderDetailWithItemsPublic,
     OrderUpdate,
      OrderSortBy, OrderSortDirection, OrderStatus,
@@ -39,9 +38,10 @@ from models import (
      )
 
 from services.orders import (
-    create_order_service)
+    create_order_service,
+    get_order_service)
 
-#     get_order_detail_service,
+
 #     get_order_detail_with_items_service,
 #     list_active_orders_service,
 #     update_order_service,
@@ -61,7 +61,6 @@ router = APIRouter(prefix="/organizations/{organization_id}/orders",
     response_model=OrderPublic,
     status_code=status.HTTP_201_CREATED,
 )
-
 def create_order(
     order: OrderCreate,
     tenant: TenantContext =
@@ -69,43 +68,45 @@ def create_order(
     session: Session=
         Depends(get_session),
 ):
-    db_order = create_order_service(
+    try:
+        db_order = create_order_service(
         tenant=tenant,
         total_cents=order.total_cents,
         status=order.status,
         session=session,
     )
 
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Order could not be created") from error
+
     return to_order_public(db_order)
 
 
+@router.get("/{order_id}", 
+            response_model=OrderPublic
+            )
+def read_order(
+    order_id: int,
+    tenant: TenantContext = 
+    Depends(get_tenant_context),
+    session: Session = Depends(get_session),
+    ):
+
+    try:
+        db_order = get_order_service(
+            order_id=order_id,
+            tenant=tenant,
+            session=session,
+        )
+
+    except OrderNotFoundError as error:
+        raise HTTPException(status_code=404, detail=error.detail) from error
+
+    return to_order_public(db_order)
 
 
-# @router.post("", 
-#              response_model=OrderPublic, status_code=201)
-# def create_orderr(
-#     order: OrderCreate,
-#     current_user: AuthContext = Depends(get_current_user),
-#     session: Session = Depends(get_session),
-# ):
-#     print(current_user.user_id, flush=True)
-#     try:
-#         db_order = create_order_service(
-#             customer_id=order.customer_id,
-#             owner_id=current_user.user_id,
-#             total_cents=order.total_cents,
-#             status=order.status,
-#             session=session,
-#         )
-#     except CustomerNotFoundError as error:
-#         raise HTTPException(status_code=404, detail=error.detail) from error
-
-#     except DataIntegrityError as error:
-#         raise HTTPException(status_code=500, 
-#                             detail='internal server error'
-#                             ) from error
-    
-#     return to_order_public(db_order)
 
 
 # @router.post("/with-items",
@@ -170,26 +171,6 @@ def create_order(
 #     return response
 
 
-# @router.get("/{order_id}", 
-#             response_model=OrderDetailPublic)
-# def read_order(
-#     order_id: int,
-#     session: Session = Depends(get_session),
-#     ):
-
-#     try:
-#         db_order, db_customer = get_order_detail_service(
-#             order_id=order_id,
-#             session=session,
-#         )
-
-#     except OrderNotFoundError as error:
-#         raise HTTPException(status_code=404, detail=error.detail) from error
-    
-#     except DataIntegrityError as error:
-#         raise HTTPException(status_code=500, detail='internal server error') from error
-
-#     return to_order_detail_public(db_order, db_customer)
 
 
 # @router.get("/{order_id}/detail", 

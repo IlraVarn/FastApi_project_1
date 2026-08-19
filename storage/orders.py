@@ -26,6 +26,25 @@ def add_order_record(
     return db_order
 
 
+def get_active_order_by_id(
+    *,
+    order_id: int,
+    organization_id: int,
+    session: Session,
+) -> Order | None:
+
+    """Return an active Order by ID, or None if missing or archived."""
+
+    statement = (
+        select(Order)
+        .where(
+        col(Order.id) == order_id,
+            Order.organization_id == organization_id,
+            col(Order.archived_at).is_(None),
+        ))
+
+    return session.exec(statement).first()
+
 
 # def add_order_recordd(
 #     customer_id: int,
@@ -52,19 +71,6 @@ def add_order_record(
 #     return db_order
 
 
-# def get_active_order_by_id(
-#     *,
-#     order_id: int,
-#     session: Session,
-# ) -> Order | None:
-#     """Return an active Order by ID, or None if missing or archived."""
-
-#     statement = select(Order).where(
-#         col(Order.id) == order_id,
-#         col(Order.archived_at).is_(None),
-#     )
-
-#     return session.exec(statement).first()
 
 
 # def get_order_by_id_include_archived(
