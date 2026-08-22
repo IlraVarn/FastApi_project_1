@@ -17,6 +17,7 @@ from errors import (ConflictError,
                     CustomerNotFoundError, 
                     DataIntegrityError,
                     InvalidOrderUpdateError,
+                    InvalidOrderStateTransitionError,
                     InvalidOrderStateTransitionError)
 from mappers import (
     to_order_public,)
@@ -28,18 +29,22 @@ from mappers import (
 from models import (
     OrderCreate,
     OrderPublic,
-    OrderDetailWithItemsPublic,
+    #OrderDetailWithItemsPublic,
     OrderUpdate,
      OrderSortBy, OrderSortDirection, OrderStatus,
      ItemForOrderWithItemsCreate, 
      OrderWithItemsCreate,
      OrderUpdatePatch,
      OrderStatusCountPublic,
+     OrderStateTransitionRequest,
      )
 
 from services.orders import (
     create_order_service,
-    get_order_service)
+    get_order_service,
+    )
+
+from services.order_transitions import transition_order_state_service
 
 
 #     get_order_detail_with_items_service,
@@ -72,7 +77,6 @@ def create_order(
         db_order = create_order_service(
         tenant=tenant,
         total_cents=order.total_cents,
-        status=order.status,
         session=session,
     )
 
@@ -103,6 +107,40 @@ def read_order(
 
     except OrderNotFoundError as error:
         raise HTTPException(status_code=404, detail=error.detail) from error
+
+    return to_order_public(db_order)
+
+
+@router.post(
+    "/{order_id}/state_transitions",
+    response_model=OrderPublic,
+)
+def transition_order(
+    order_id: int,
+    transition: OrderStateTransitionRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_session),
+):
+    try:
+        db_order = transition_order_state_service(
+            tenant=tenant,
+            order_id=order_id,
+            new_status=transition.target_status,
+            reason=transition.reason,
+            session=session,
+        )
+
+    except OrderNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error.detail,
+        ) from error
+
+    except InvalidOrderStateTransitionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Order transition is not allowed",
+        ) from error
 
     return to_order_public(db_order)
 
@@ -198,27 +236,6 @@ def read_order(
 #     )
 
 
-# @router.put("/{order_id}", 
-#             response_model=OrderDetailPublic)
-# def update_order(
-#     order_id: int,
-#     order: OrderUpdate,
-#     session: Session = Depends(get_session),
-# ):
-#     try:
-#         db_order, db_customer = update_order_service(
-#             order_id=order_id,
-#             total_cents=order.total_cents,
-#             status=order.status,
-#             session=session,
-#         )
-#     except OrderNotFoundError as error:
-#         raise HTTPException(status_code=404, detail=error.detail) from error
-    
-#     except DataIntegrityError as error:
-#         raise HTTPException(status_code=500, detail='internal server error') from error
-
-#     return to_order_detail_public(db_order, db_customer)
 
 
 # @router.get("", 

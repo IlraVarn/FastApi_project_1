@@ -42,4 +42,3 @@ class UserNotFoundError(AppError):
 # application/domain error. It does not know anything about HTTP.
 class TenantAccessDeniedError(Exception):
     pass
-

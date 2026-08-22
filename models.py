@@ -4,6 +4,38 @@ from pydantic import field_validator, EmailStr, ConfigDict
 from datetime import datetime, UTC
 from typing import Literal, ClassVar
 from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
+from enum import Enum
+
+#USERS
+class User(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "users"
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_users_email",),
+        CheckConstraint("length(trim(name)) > 0", name="ck_user_name_non_empty"),
+        CheckConstraint("length(trim(email)) > 0", name="ck_user_email_non_empty"),
+        )
+    
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False)
+    email: str = Field(nullable=False)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False)
+    )
+    archived_at: datetime | None = Field(
+        default=None, 
+        sa_column=Column(
+            DateTime(timezone=True),
+        nullable=True)
+    )
+
+
+class UserPublic(SQLModel):
+    id: int
+    name: str
+    email: str
 
 
 #ORGANIZATIONS
@@ -36,39 +68,6 @@ class OrganizationPublic(SQLModel):
     name: str
 
 
-#USERS
-class User(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "users"
-    __table_args__ = (
-        UniqueConstraint("email", name="uq_users_email",),
-        CheckConstraint("length(trim(name)) > 0", name="ck_user_name_non_empty"),
-        CheckConstraint("length(trim(email)) > 0", name="ck_user_email_non_empty"),
-        )
-    
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(nullable=False)
-    email: str = Field(nullable=False)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(
-            DateTime(timezone=True),
-            nullable=False)
-    )
-    archived_at: datetime | None = Field(
-        default=None, 
-        sa_column=Column(
-            DateTime(timezone=True),
-        nullable=True)
-    )
-
-
-
-class UserPublic(SQLModel):
-    id: int
-    name: str
-    email: str
-
-
 #MEMBERSHIPS
 class Membership(SQLModel, table=True):
     __tablename__: ClassVar[str] = "memberships"
@@ -91,14 +90,17 @@ class MembershipPublic(SQLModel):
     organization_id: int
     status: Literal["active", "inactive"]
 
-    
+
 
 #ORDERS
+
 class Order(SQLModel, table=True):
     __tablename__: ClassVar[str] = "orders"
     __table_args__ = (
-        CheckConstraint("total_cents >= 0", name="ck_order_total_cents_non_negative"),
-        CheckConstraint("status IN ('paid', 'pending')", name="ck_order_status_valid"),
+        CheckConstraint("total_cents >= 0", 
+                        name="ck_order_total_cents_non_negative"),
+        CheckConstraint("status IN ('draft', 'submitted', 'approved', 'rejected')", 
+                        name="ck_order_status_valid"),
     )
     
     id: int | None = Field(default=None, primary_key=True)
@@ -114,7 +116,8 @@ class Order(SQLModel, table=True):
         index=True)
     
     total_cents: int = Field(nullable=False)
-    status: str = Field(nullable=False)
+    status: str = Field(default=OrderStatus.DRAFT.value,
+                        nullable=False)
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
@@ -133,6 +136,13 @@ class Order(SQLModel, table=True):
     reference: str | None = Field(default=None, nullable=True)
 
 
+class OrderStatus(str, Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"    
+
+
 class OrderUpdatePatch(SQLModel):
     """ extra= forbid sends back 422 if clent sends additional field.
     rejects fields the client cannot mutate"""
@@ -148,9 +158,7 @@ class OrderUpdate(SQLModel):
 
 
 class OrderCreate(SQLModel):
-    customer_id: int = Field(ge=1)
     total_cents: int = Field(ge=0)
-    status: Literal['paid', 'pending']
 
     @field_validator("status", mode='before')
     @classmethod
@@ -177,22 +185,57 @@ class OrderPublic(SQLModel):
     created_at: datetime
     total_cents: int
     status: str
-    
 
-class OrderDetailPublic(SQLModel):
-    id: int
-    created_at: datetime
-    customer: CustomerPublic
-    total_cents: int
-    status: str
-  
     
-class OrderDetailWithItemsPublic(SQLModel):
-    id: int
-    created_at: datetime
-    customer: CustomerPublic
-    total_cents: int
-    items: list[OrderItemPublic]
+# class OrderDetailWithItemsPublic(SQLModel):
+#     id: int
+#     created_at: datetime
+#     customer: CustomerPublic
+#     total_cents: int
+#     items: list[OrderItemPublic]
+#ORDER STATE TRANSITIONS
+class OrderStateTransition(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "order_transitions"
+
+    id: int | None = Field(
+        default=None,
+        primary_key=True,
+    )
+
+    order_id: int = Field(
+        foreign_key="orders.id",
+        nullable=False,
+        index=True,
+    )
+
+    actor_user_id: int = Field(
+        foreign_key="users.id",
+        nullable=False,
+        index=True,
+    )
+
+    previous_status: str = Field(nullable=False)
+
+    new_status: str = Field(nullable=False)
+
+    reason: str | None = Field(
+        default=None,
+        nullable=True,
+    )
+
+    occurred_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+        ),
+    )
+
+
+class OrderStateTransitionRequest(SQLModel):
+    target_status: OrderStatus
+    reason: str | None = None
+
 
 
 #ITEMS
@@ -257,18 +300,18 @@ class OrderItemPublic(SQLModel):
 
 
 #JOIN RESPONSE MODELS   
-class CustomerWithOrdersPublic(SQLModel):
-    id: int
-    name: str
-    email: str
-    orders: list[OrderSummaryPerCustomerPublic]
+# class CustomerWithOrdersPublic(SQLModel):
+#     id: int
+#     name: str
+#     email: str
+#     orders: list[OrderSummaryPerCustomerPublic]
 
 
-class OrderSummaryPerCustomerPublic(SQLModel):
-    id: int
-    created_at: datetime
-    total_cents: int
-    status: str
+# class OrderSummaryPerCustomerPublic(SQLModel):
+#     id: int
+#     created_at: datetime
+#     total_cents: int
+#     status: str
 
 
 MembershipStatus = Literal["active", "inactive"]
@@ -280,7 +323,7 @@ MembershipStatus = Literal["active", "inactive"]
 
 OrderSortBy = Literal["created_at", "total_cents", "id"]
 OrderSortDirection = Literal["asc", "desc"]
-OrderStatus = Literal["paid", "pending"]
+#OrderStatus = Literal["paid", "pending"]
 
 ORDER_SORT_COLUMNS = {
     "created_at": Order.created_at,

@@ -1,7 +1,8 @@
 from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
-from models import (Order, OrderItem, OrderUpdate,  OrderStatus, 
+from models import (Order, 
+                    OrderStateTransition,OrderItem, OrderUpdate,  OrderStatus, 
                     OrderSortBy, OrderSortDirection)
 from models import ORDER_SORT_COLUMNS
 from typing import Any
@@ -15,6 +16,11 @@ def add_order_record(
     status: str,
     session: Session,
 ) -> Order:
+    """Create and stage a new Order for persistence.
+
+    Order model defaults initialize created_at and updated_at.
+    Does not commit, rollback, or refresh.
+    """
     db_order = Order(
         organization_id=organization_id,
         total_cents=total_cents,
@@ -46,29 +52,21 @@ def get_active_order_by_id(
     return session.exec(statement).first()
 
 
-# def add_order_recordd(
-#     customer_id: int,
-#     owner_id: int,
-#     total_cents: int,
-#     status: str,
-#     session: Session,
-#     ) -> Order:
+def update_order_status_record(
+    *,
+    db_order: Order,
+    new_status: str,
+    changed_at: datetime,
+    session: Session,
+) -> Order:
+    
+    db_order.status = new_status
+    db_order.updated_at = changed_at
 
-#     """Create and stage a new Order for persistence.
+    session.add(db_order)
 
-#     Order model defaults initialize created_at and updated_at.
-#     Does not commit, rollback, or refresh.
-#     """
-      
-#     db_order = Order(
-#         customer_id=customer_id,
-#         owner_id=owner_id,
-#         total_cents=total_cents,
-#         status=status,
-#     )
+    return db_order
 
-#     session.add(db_order)
-#     return db_order
 
 
 
