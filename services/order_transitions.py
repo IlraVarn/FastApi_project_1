@@ -5,8 +5,9 @@ from sqlmodel import Session
 
 from errors import (
     DataIntegrityError,
-    InvalidOrderTransitionError,
+    InvalidOrderStateTransitionError,
     OrderNotFoundError,
+    RejectionReasonRequiredError
 )
 from models import Order, OrderStatus
 from storage.order_transitions import add_order_transition_record
@@ -51,6 +52,7 @@ def transition_order_state_service(
 
     try:
         current_status = OrderStatus(db_order.status)
+
     except ValueError as error:
         raise DataIntegrityError() from error
 
@@ -61,11 +63,12 @@ def transition_order_state_service(
 
     changed_at = datetime.now(UTC)
 
-    cleaned_reason = reason.strip() if reason is not None else None
-
-    if cleaned_reason == "":
-        cleaned_reason = None
-
+    if (
+        new_status == OrderStatus.REJECTED
+        and reason is None
+    ):
+        raise RejectionReasonRequiredError()
+    
     if db_order.id is None:
         raise DataIntegrityError()
 
@@ -82,7 +85,7 @@ def transition_order_state_service(
             actor_user_id=tenant.user_id,
             previous_status=current_status.value,
             new_status=new_status.value,
-            reason=cleaned_reason,
+            reason=reason,
             occurred_at=changed_at,
             session=session,
         )
@@ -100,3 +103,5 @@ def transition_order_state_service(
     session.refresh(db_order)
 
     return db_order
+
+

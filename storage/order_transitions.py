@@ -2,21 +2,21 @@ from datetime import datetime
 
 from sqlmodel import Session, select, col
 
-from models import Order, OrderStateTransition
+from models import Gate, GateStateTransition
 
 
-def add_order_transition_record(
+def add_gate__state_transition_record(
     *,
-    order_id: int,
+    gate_id: int,
     actor_user_id: int,
     previous_status: str,
     new_status: str,
     reason: str | None,
     occurred_at: datetime,
     session: Session,
-) -> OrderStateTransition:
-    db_transition = OrderStateTransition(
-        order_id=order_id,
+) -> GateStateTransition:
+    db_transition = GateStateTransition(
+        gate_id=gate_id,
         actor_user_id=actor_user_id,
         previous_status=previous_status,
         new_status=new_status,
@@ -29,25 +29,25 @@ def add_order_transition_record(
     return db_transition
 
 
-def list_order_transition_records(
+def list_gate_state_transition_records(
     *,
     order_id: int,
     organization_id: int,
     session: Session,
-) -> list[OrderStateTransition]:
+) -> list[GateStateTransition]:
     statement = (
-        select(OrderStateTransition)
+        select(GateStateTransition)
         .join(
-            Order,
-            col(OrderStateTransition.order_id) == col(Order.id),
+            Gate,
+            col(GateStateTransition.gate_id) == col(Gate.id),
         )
         .where(
-            col(OrderStateTransition.order_id) == order_id,
-            col(Order.organization_id) == organization_id,
+            col(GateStateTransition.gate_id) == order_id,
+            col(Gate) == organization_id,
         )
         .order_by(
-            col(OrderStateTransition.occurred_at),
-            col(OrderStateTransition.id),
+            col(GateStateTransition.occurred_at),
+            col(GateStateTransition.id),
         )
     )
 

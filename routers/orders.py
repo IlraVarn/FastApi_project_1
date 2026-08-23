@@ -14,11 +14,11 @@ from sqlmodel import Session
 from db import get_session
 from errors import (ConflictError, 
                     OrderNotFoundError, 
-                    CustomerNotFoundError, 
                     DataIntegrityError,
                     InvalidOrderUpdateError,
                     InvalidOrderStateTransitionError,
-                    InvalidOrderStateTransitionError)
+                    InvalidOrderStateTransitionError,
+                    RejectionReasonRequiredError)
 from mappers import (
     to_order_public,)
 
@@ -27,16 +27,16 @@ from mappers import (
 #     to_order_public_list
 # )
 from models import (
-    OrderCreate,
     OrderPublic,
     #OrderDetailWithItemsPublic,
     OrderUpdate,
-     OrderSortBy, OrderSortDirection, OrderStatus,
+     OrderSortBy, OrderSortDirection, GateStatus,
      ItemForOrderWithItemsCreate, 
      OrderWithItemsCreate,
      OrderUpdatePatch,
      OrderStatusCountPublic,
      OrderStateTransitionRequest,
+     GateCreateRequest
      )
 
 from services.orders import (
@@ -44,7 +44,7 @@ from services.orders import (
     get_order_service,
     )
 
-from services.order_transitions import transition_order_state_service
+from services.order_transitions import transition_gate_state_service
 
 
 #     get_order_detail_with_items_service,
@@ -67,7 +67,7 @@ router = APIRouter(prefix="/organizations/{organization_id}/orders",
     status_code=status.HTTP_201_CREATED,
 )
 def create_order(
-    order: OrderCreate,
+    order: GateCreateRequest,
     tenant: TenantContext =
         Depends(get_tenant_context),
     session: Session=
@@ -92,15 +92,15 @@ def create_order(
             response_model=OrderPublic
             )
 def read_order(
-    order_id: int,
+    gate_id: int,
     tenant: TenantContext = 
     Depends(get_tenant_context),
     session: Session = Depends(get_session),
     ):
 
     try:
-        db_order = get_order_service(
-            order_id=order_id,
+        db_gate = get_order_service(
+            gate_id=gate_id,
             tenant=tenant,
             session=session,
         )
@@ -108,23 +108,23 @@ def read_order(
     except OrderNotFoundError as error:
         raise HTTPException(status_code=404, detail=error.detail) from error
 
-    return to_order_public(db_order)
+    return to_order_public(db_gate)
 
 
 @router.post(
-    "/{order_id}/state_transitions",
+    "/{order_id}/state-transitions",
     response_model=OrderPublic,
 )
 def transition_order(
-    order_id: int,
+    gate_id: int,
     transition: OrderStateTransitionRequest,
     tenant: TenantContext = Depends(get_tenant_context),
     session: Session = Depends(get_session),
 ):
     try:
-        db_order = transition_order_state_service(
+        db_gate = transition_gate_state_service(
             tenant=tenant,
-            order_id=order_id,
+            gate_id=gate_id,
             new_status=transition.target_status,
             reason=transition.reason,
             session=session,
@@ -142,7 +142,18 @@ def transition_order(
             detail="Order transition is not allowed",
         ) from error
 
-    return to_order_public(db_order)
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Order transition could not be completed") from error
+
+    except RejectionReasonRequiredError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Rejection reason required",
+        ) from error
+
+    return to_order_public(db_gate)
 
 
 

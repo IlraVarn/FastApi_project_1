@@ -8,16 +8,12 @@ class AppError(Exception):
         super().__init__(self.detail)
 
 
-
-
 class DataIntegrityError(AppError):
     default_detail = "database integrity error"
 
 class DuplicateCustomerEmailError(AppError):
     default_detail = "customer email already exists"
 
-class CustomerNotFoundError(AppError):
-    default_detail = "customer not found"
 
 class OrderNotFoundError(AppError):
     default_detail = "order not found"
@@ -42,3 +38,12 @@ class UserNotFoundError(AppError):
 # application/domain error. It does not know anything about HTTP.
 class TenantAccessDeniedError(Exception):
     pass
+
+class RejectionReasonRequiredError(AppError):
+    default_detail = "rejection reason required"
+
+
+
+# class CustomerNotFoundError(AppError):
+#     default_detail = "customer not found"
+

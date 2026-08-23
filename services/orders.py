@@ -2,20 +2,19 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 from tenancy.context import TenantContext
-from errors import (CustomerNotFoundError, 
-                    OrderNotFoundError, 
+from errors import ( OrderNotFoundError, 
                     DataIntegrityError, 
                     ConflictError,
                     InvalidOrderStateTransitionError,
                     InvalidOrderUpdateError,)
-from models import (Order, OrderCreate, OrderItem, OrderUpdate, 
-                    OrderSortDirection, OrderSortBy, OrderStatus,
+from models import (Gate, GateCreateRequest, OrderItem, OrderUpdate, 
+                    OrderSortDirection, OrderSortBy, GateStatus,
                     ItemForOrderWithItemsCreate,
                     OrderUpdatePatch)
 from typing import Literal, Any
 from sqlalchemy import asc, desc
 from storage.orders import (add_order_record, 
-                            get_active_order_by_id,
+                            get_active_gate_by_id,
                             )
 
                             # update_order,
@@ -33,14 +32,11 @@ from storage.items import list_items_by_order_id, create_item_record
 def create_order_service(
     *,
     tenant: TenantContext,
-    total_cents: int,
-    status: str,
     session: Session,
-) -> Order:
+) -> Gate:
     db_order = add_order_record(
         organization_id=tenant.organization_id,
-        total_cents=total_cents,
-        status=status,
+        status=GateStatus.DRAFT.value,
         session=session,
     )
 
@@ -62,12 +58,12 @@ def create_order_service(
 
 def get_order_service(*,
     tenant: TenantContext,
-    order_id: int,
+    gate_id: int,
     session: Session,
-) -> Order:
+) -> Gate:
     
-    db_order = get_active_order_by_id(
-        order_id=order_id, 
+    db_order = get_active_gate_by_id(
+        gate_id=gate_id, 
         organization_id=tenant.organization_id,
         session=session)
 

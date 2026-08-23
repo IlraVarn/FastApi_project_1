@@ -1,10 +1,10 @@
 from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
-from models import (Order, 
-                    OrderStateTransition,OrderItem, OrderUpdate,  OrderStatus, 
+from models import (Gate, 
+                    GateStateTransition,OrderItem, OrderUpdate,  GateStatus, 
                     OrderSortBy, OrderSortDirection)
-from models import ORDER_SORT_COLUMNS
+
 from typing import Any
 
 
@@ -12,60 +12,58 @@ from typing import Any
 def add_order_record(
     *,
     organization_id: int,
-    total_cents: int,
     status: str,
     session: Session,
-) -> Order:
+) -> Gate:
     """Create and stage a new Order for persistence.
 
     Order model defaults initialize created_at and updated_at.
     Does not commit, rollback, or refresh.
     """
-    db_order = Order(
+    db_gate = Gate(
         organization_id=organization_id,
-        total_cents=total_cents,
         status=status,
     )
 
-    session.add(db_order)
+    session.add(db_gate)
 
-    return db_order
+    return db_gate
 
 
-def get_active_order_by_id(
+def get_active_gate_by_id(
     *,
-    order_id: int,
+    gate_id: int,
     organization_id: int,
     session: Session,
-) -> Order | None:
+) -> Gate | None:
 
     """Return an active Order by ID, or None if missing or archived."""
 
     statement = (
-        select(Order)
+        select(Gate)
         .where(
-        col(Order.id) == order_id,
-            Order.organization_id == organization_id,
-            col(Order.archived_at).is_(None),
+        col(Gate.id) == gate_id,
+            Gate.organization_id == organization_id,
+            col(Gate.archived_at).is_(None),
         ))
 
     return session.exec(statement).first()
 
 
-def update_order_status_record(
+def update_gate_status_record(
     *,
-    db_order: Order,
+    db_gate: Gate,
     new_status: str,
     changed_at: datetime,
     session: Session,
-) -> Order:
+) -> Gate:
     
-    db_order.status = new_status
-    db_order.updated_at = changed_at
+    db_gate.status = new_status
+    db_gate.updated_at = changed_at
 
-    session.add(db_order)
+    session.add(db_gate)
 
-    return db_order
+    return db_gate
 
 
 
