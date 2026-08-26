@@ -1,9 +1,9 @@
-from storage.orders import list_order_customer_pairs
+from storage.gates import list_order_customer_pairs
 from models import Customer, Order
 from datetime import UTC, datetime
 
-from services.orders import create_order_service
-from storage.orders import list_order_customer_pairs
+from services.gates import create_order_service
+from storage.gates import list_order_customer_pairs
 
 
 #JOIN test

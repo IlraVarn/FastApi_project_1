@@ -16,7 +16,7 @@ from models import (OrderCreate,
                     ItemForOrderWithItemsCreate,
                     OrderItem)
 from services.customers import (create_customer_service)
-from services.orders import (create_order_service,
+from services.gates import (create_order_service,
                              get_order_detail_service,
                              get_order_detail_with_items_service,
                              list_active_orders_service,

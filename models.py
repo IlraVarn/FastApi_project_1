@@ -6,6 +6,32 @@ from typing import Literal, ClassVar
 from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
 from enum import Enum
 
+
+# User
+# UserPublic
+
+# Organization
+# OrganizationCreate
+# OrganizationPublic
+
+# Membership
+# MembershipPublic
+
+# GateStatus
+# Gate
+# GatePublic
+# GateWithRequirementsPublic(GatePublic)
+# GateCreateRequest
+
+# GateRequirementType
+# GateRequirement
+# GateRequirementPublic
+
+# GateEvidence
+
+# GateStateTransition
+# GateStateTransitionRequest
+
 #USERS
 class User(SQLModel, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -91,8 +117,7 @@ class MembershipPublic(SQLModel):
     status: Literal["active", "inactive"]
 
 
-
-#ORDERS
+#GATES
 class GateStatus(str, Enum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
@@ -100,34 +125,53 @@ class GateStatus(str, Enum):
     REJECTED = "rejected"    
 
 
+class GateType(str, Enum):
+    COMMISSIONING_ACCEPTANCE = "commissioning_acceptance"
+    CLOSEOUT_HANDOFF = "closeout_handoff"
+    READINESS_REVIEW = "readiness_review"
+
+
 class Gate(SQLModel, table=True):
     __tablename__: ClassVar[str] = "gates"
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'submitted', 'approved', 'rejected')", 
                         name="ck_gate_status_valid"),
+        CheckConstraint(
+            """
+            gate_type IN (
+                'commissioning_acceptance',
+                'closeout_handoff',
+                'readiness_review'
+            )
+            """,
+            name="ck_gate_type_valid",
+        ),
     )
     
-    id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(
-            DateTime(timezone=True),
-            nullable=False)
-    )
+    id: int | None = Field(default=None, primary_key=True)    
+
     organization_id: int = Field(
         nullable=False, 
         foreign_key='organizations.id',
         index=True)
 
+    gate_type: str = Field(nullable=False)
+
     status: str = Field(default=GateStatus.DRAFT.value,
                         nullable=False)
+    
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False))
+
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True),
-            nullable=False,
-        ),
-    )
+            nullable=False,))
+    
     #archived_at controls lyfecycle state so nullable makes it excplicit. 
     #i.e. archived_at is None => active order. Not none => archived order
     archived_at: datetime | None = Field(
@@ -139,114 +183,40 @@ class Gate(SQLModel, table=True):
     reference: str | None = Field(default=None, nullable=True)
 
 
-class OrderUpdatePatch(SQLModel):
-    """ extra= forbid sends back 422 if clent sends additional field.
-    rejects fields the client cannot mutate"""
-    model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
-
-    total_cents: int | None = Field(default=None, ge=0)
-    status: OrderStatus | None = None
-
-
-class OrderUpdate(SQLModel):
-    total_cents: int = Field(ge=0)
-    status: OrderStatus
-
-
 class GateCreateRequest(SQLModel):
-    requirement_types: list[GateRequirementType]
+    gate_type: GateType
+    requirement_types: list[GateRequirementType] = Field(
+        min_length=1,
+    )
 
 
+class GatePublic(SQLModel):
+    id: int
+    organization_id: int
+    gate_type: str
+    status: GateStatus
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+    reference: str | None
 
 
-class OrderStatusCountPublic(SQLModel):
-    status: str
+class GateListPublic(SQLModel):
+    data: list[GatePublic]
     count: int
 
-    
-class OrderWithItemsCreate(SQLModel):
-    customer_id: int = Field(ge=1)
-    status: Literal['paid', 'pending']
-    items: list[ItemForOrderWithItemsCreate] = Field(min_length=1)
+
+class GateWithRequirementsPublic(GatePublic):
+    requirements: list[GateRequirementPublic]
 
 
-class OrderPublic(SQLModel):
-    id: int
-    created_at: datetime
-    total_cents: int
-    status: str
-
-    
-# class OrderDetailWithItemsPublic(SQLModel):
-#     id: int
-#     created_at: datetime
-#     customer: CustomerPublic
-#     total_cents: int
-#     items: list[OrderItemPublic]
-#ORDER STATE TRANSITIONS
-class GateStateTransition(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "gate_state_transitions"
-
-    id: int | None = Field(
-        default=None,
-        primary_key=True,
-    )
-
-    gate_id: int = Field(
-        foreign_key="gates.id",
-        nullable=False,
-        index=True,
-    )
-
-    actor_user_id: int = Field(
-        foreign_key="users.id",
-        nullable=False,
-        index=True,
-    )
-
-    previous_status: str = Field(nullable=False)
-
-    new_status: str = Field(nullable=False)
-
-    reason: str | None = Field(
-        default=None,
-        nullable=True,
-    )
-
-    occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(
-            DateTime(timezone=True),
-            nullable=False,
-        ),
-    )
-
-
-class GateStateTransitionRequest(SQLModel):
-    target_status: GateStatus
-    reason: str | None = None
-
-    @field_validator("reason")
-    @classmethod
-    def normalize_reason(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-
-        value = value.strip()
-
-        if value == "":
-            return None
-
-        return value
-
-
-
-#GATE REQUIREMENT (instead of OrderItem)
+#GATE REQUIREMENTs (instead of OrderItems)
 class GateRequirementType(str, Enum):
     COMMISSIONING_REPORT = "commissioning_report"
     AS_BUILT_DRAWINGS = "as_built_drawings"
     O_AND_M_MANUALS = "o_and_m_manuals"
     TEST_RECORDS = "test_records"
+
 
 class GateRequirement(SQLModel, table=True):
     __tablename__: ClassVar[str] = "gate_requirements"
@@ -293,14 +263,20 @@ class GateRequirement(SQLModel, table=True):
     )
 
 
+class GateRequirementPublic(SQLModel):
+    id: int
+    requirement_type: GateRequirementType
+    created_at: datetime
+
+
 #GATE EVIDENCE
 class GateEvidence(SQLModel, table=True):
     __tablename__: ClassVar[str] = "gate_evidence"
 
     __table_args__ = (
         CheckConstraint(
-            "size_bytes >= 0",
-            name="ck_gate_evidence_size_nonnegative",
+            "size_bytes > 0",
+            name="ck_gate_evidence_size_positive",
         ),
         CheckConstraint(
             "upload_status IN ('pending', 'complete', 'failed')",
@@ -359,24 +335,121 @@ class GateEvidence(SQLModel, table=True):
         ),
     )
 
-#ITEMS
-class OrderItem(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "order_items"
 
-    __table_args__ = (
-        CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
-        CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),
-        CheckConstraint("length(trim(product_name)) > 0", name="ck_product_name_non_empty"),
+#ORDER STATE TRANSITIONS
+class GateStateTransition(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "gate_state_transitions"
+
+    id: int | None = Field(
+        default=None,
+        primary_key=True,
     )
 
-    id: int | None = Field(default=None, primary_key=True)
-    order_id: int = Field(
-        foreign_key="orders.id", 
+    gate_id: int = Field(
+        foreign_key="gates.id",
         nullable=False,
-        index=True)
-    product_name: str = Field(nullable=False)
-    quantity: int = Field(nullable=False)
-    unit_price_cents: int = Field(nullable=False)
+        index=True,
+    )
+
+    actor_user_id: int = Field(
+        foreign_key="users.id",
+        nullable=False,
+        index=True,
+    )
+
+    previous_status: str = Field(nullable=False)
+
+    new_status: str = Field(nullable=False)
+
+    reason: str | None = Field(
+        default=None,
+        nullable=True,
+    )
+
+    occurred_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+        ),
+    )
+
+
+class GateStateTransitionRequest(SQLModel):
+    target_status: GateStatus
+    reason: str | None = None
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        value = value.strip()
+
+        if value == "":
+            return None
+
+        return value
+
+
+#OLD MODELS
+
+class OrderUpdatePatch(SQLModel):
+    """ extra= forbid sends back 422 if clent sends additional field.
+    rejects fields the client cannot mutate"""
+    model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
+
+    total_cents: int | None = Field(default=None, ge=0)
+    status: OrderStatus | None = None
+
+
+class OrderUpdate(SQLModel):
+    total_cents: int = Field(ge=0)
+    status: OrderStatus
+
+class OrderStatusCountPublic(SQLModel):
+    status: str
+    count: int
+
+    
+class OrderWithItemsCreate(SQLModel):
+    customer_id: int = Field(ge=1)
+    status: Literal['paid', 'pending']
+    items: list[ItemForOrderWithItemsCreate] = Field(min_length=1)
+
+
+class OrderPublic(SQLModel):
+    id: int
+    created_at: datetime
+    total_cents: int
+    status: str
+
+
+# class OrderDetailWithItemsPublic(SQLModel):
+#     id: int
+#     created_at: datetime
+#     customer: CustomerPublic
+#     total_cents: int
+#     items: list[OrderItemPublic]    
+#ITEMS
+# class OrderItem(SQLModel, table=True):
+#     __tablename__: ClassVar[str] = "order_items"
+
+#     __table_args__ = (
+#         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
+#         CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),
+#         CheckConstraint("length(trim(product_name)) > 0", name="ck_product_name_non_empty"),
+#     )
+
+#     id: int | None = Field(default=None, primary_key=True)
+#     order_id: int = Field(
+#         foreign_key="orders.id", 
+#         nullable=False,
+#         index=True)
+#     product_name: str = Field(nullable=False)
+#     quantity: int = Field(nullable=False)
+#     unit_price_cents: int = Field(nullable=False)
 
 
 class OrderItemCreate(SQLModel):
@@ -435,9 +508,6 @@ class OrderItemPublic(SQLModel):
 #     status: str
 
 
-
-
-
 #ORDERS SORT
 
 OrderSortBy = Literal["created_at", "total_cents", "id"]
@@ -451,19 +521,3 @@ OrderSortDirection = Literal["asc", "desc"]
 # }
 
 
-#ITEMS SORT
-
-ItemsSortDirection = Literal['asc', 'desc']
-ItemSortBy = Literal[
-                    "product_name", 
-                    "quantity",
-                    "unit_price_cents",
-                    'id'
-]
-
-ITEM_SORT_COLUNMS = {
-    "product_name": OrderItem.product_name,
-    "quanity": OrderItem.quantity,
-    "unit_price_cents": OrderItem.unit_price_cents,
-    'id': OrderItem.id
-}

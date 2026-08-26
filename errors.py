@@ -15,8 +15,8 @@ class DuplicateCustomerEmailError(AppError):
     default_detail = "customer email already exists"
 
 
-class OrderNotFoundError(AppError):
-    default_detail = "order not found"
+class GateNotFoundError(AppError):
+    default_detail = "gate not found"
 
 class ItemNotFoundError(AppError):
     default_detail = "item not found"
@@ -24,11 +24,11 @@ class ItemNotFoundError(AppError):
 class ConflictError(AppError):
     default_detail = "conflict"
 
-class InvalidOrderUpdateError(AppError):
+class InvalidGateUpdateError(AppError):
     default_detail = "request is empty or supplies null"
 
-class InvalidOrderStateTransitionError(AppError):
-    default_detail = "requested change conflicts with the order's current state"
+class InvalidGateStateTransitionError(AppError):
+    default_detail = "requested change conflicts with the gate's current state"
 
 
 class UserNotFoundError(AppError):

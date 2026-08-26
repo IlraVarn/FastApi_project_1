@@ -2,164 +2,121 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, col
 from tenancy.context import TenantContext
-from errors import ( OrderNotFoundError, 
+from errors import ( GateNotFoundError, 
                     DataIntegrityError, 
                     ConflictError,
-                    InvalidOrderStateTransitionError,
-                    InvalidOrderUpdateError,)
-from models import (Gate, GateCreateRequest, OrderItem, OrderUpdate, 
+                    InvalidGateStateTransitionError,
+                    InvalidGateUpdateError,)
+from models import (Gate, GateType,GateCreateRequest, GateRequirement, 
                     OrderSortDirection, OrderSortBy, GateStatus,
-                    ItemForOrderWithItemsCreate,
-                    OrderUpdatePatch)
+                    ItemForOrderWithItemsCreate, GateRequirementType
+                    )
 from typing import Literal, Any
 from sqlalchemy import asc, desc
-from storage.orders import (add_order_record, 
+from storage.gates import (add_gate_record, 
                             get_active_gate_by_id,
                             )
 
-                            # update_order,
-                            # list_active_orders,
-                            # list_orders_by_customer_id,
-                            # update_order_patch,
-                            # get_order_by_id_include_archived,
-                            # archive_order_record,
-                            # count_active_orders_by_status,
-                            # )
-from storage.items import list_items_by_order_id, create_item_record
+from storage.items import (add_gate_requirement_record,
+                           list_requirements_by_gate_id,)
 
 
 
-def create_order_service(
+
+def create_gate_with_requirements_service(
     *,
     tenant: TenantContext,
+    gate_type: GateType,
+    requirement_types: list[GateRequirementType],
     session: Session,
-) -> Gate:
-    db_order = add_order_record(
-        organization_id=tenant.organization_id,
-        status=GateStatus.DRAFT.value,
-        session=session,
-    )
+) -> tuple[Gate, list[GateRequirement]]:
 
     try:
+
+        db_gate = add_gate_record(
+            organization_id=tenant.organization_id,
+            gate_type=gate_type,
+            status=GateStatus.DRAFT.value,
+            session=session,
+        )
+
+        session.flush()
+
+        gate_id = db_gate.id
+
+        if gate_id is None:
+            session.rollback()
+            raise DataIntegrityError()
+
+
+        db_requirements: list[GateRequirement] = []
+
+        for requirement_type in requirement_types:
+            db_requirement = add_gate_requirement_record(
+                gate_id=gate_id,
+                requirement_type=requirement_type.value,
+                session=session,
+            )
+
+            db_requirements.append(db_requirement)
+
         session.commit()
 
     except IntegrityError as error:
         session.rollback()
         raise DataIntegrityError() from error
-    
+
     except Exception:
         session.rollback()
         raise
 
-    session.refresh(db_order)
+    session.refresh(db_gate)
 
-    return db_order
+    for db_requirement in db_requirements:
+        session.refresh(db_requirement)
+
+    return db_gate, db_requirements
+
+ 
 
 
-def get_order_service(*,
-    tenant: TenantContext,
+# def get_gate_service(*,
+#     tenant: TenantContext,
+#     gate_id: int,
+#     session: Session,
+# ) -> Gate:
+    
+#     db_order = get_active_gate_by_id(
+#         gate_id=gate_id, 
+#         organization_id=tenant.organization_id,
+#         session=session)
+
+#     if db_order is None:
+#         raise OrderNotFoundError()
+
+#     return db_order
+
+
+
+
+def get_gate_with_requirements_service(*,
+    tenant: TenantContext,                                   
     gate_id: int,
     session: Session,
-) -> Gate:
-    
-    db_order = get_active_gate_by_id(
+) -> tuple[Gate, list[GateRequirement]]:
+
+    db_gate = get_active_gate_by_id(
         gate_id=gate_id, 
         organization_id=tenant.organization_id,
         session=session)
 
-    if db_order is None:
-        raise OrderNotFoundError()
+    if db_gate is None:
+        raise GateNotFoundError()
 
-    return db_order
+    db_requirements = list_requirements_by_gate_id(
+        gate_id=gate_id, session=session)
 
-
-# def create_order_with_items_service(
-#     *,
-#     customer_id: int,
-#     owner_id: int,
-#     status: OrderStatus,
-#     items: list[ItemForOrderWithItemsCreate],
-#     session: Session,
-# ) -> tuple[Order, Customer, list[OrderItem]]:
-    
-#     db_customer = get_customer_by_id(
-#         customer_id=customer_id,
-#         session=session,
-#     )
-
-#     if db_customer is None:
-#         raise CustomerNotFoundError()
-
-#     total_cents = 0
-
-#     for item in items:
-#         total_cents += item.quantity * item.unit_price_cents
-
-#     try:
-#         db_order = add_order_record(
-#             customer_id=customer_id,
-#             owner_id=owner_id,
-#             total_cents=total_cents,
-#             status=status,
-#             session=session,
-#         )
-
-#         session.flush()
-
-#         order_id = db_order.id
-
-#         #the following defensive check catches the problem at the source. 
-#         # Otherwise it surfaces at the end and loos like the items is the problem
-#         if order_id is None:
-#             session.rollback()
-#             raise DataIntegrityError()
-
-#         db_items: list[OrderItem] = []
-
-#         for item in items:
-#             db_item = create_item_record(
-#                 order_id=order_id,
-#                 product_name=item.product_name,
-#                 quantity=item.quantity,
-#                 unit_price_cents=item.unit_price_cents,
-#                 session=session,
-#             )
-
-#             db_items.append(db_item)
-
-#         session.commit()
-
-#     except IntegrityError as error:
-#         session.rollback()
-#         raise DataIntegrityError() from error
-#     except Exception:
-#         session.rollback()
-#         raise
-
-#     #only reached on success
-#     session.refresh(db_order)
-
-#     for db_item in db_items:
-#         session.refresh(db_item)
-
-#     return db_order, db_customer, db_items
-
-
-
-
-# def get_order_detail_with_items_service(
-#     order_id: int,
-#     session: Session,
-# ) -> tuple[Order, Customer, list[OrderItem]]:
-    
-#     db_order, db_customer = get_order_detail_service(
-#         order_id=order_id,
-#         session=session,
-#     )
-
-#     db_items = list_items_by_order_id(order_id=order_id, session=session)
-
-#     return db_order, db_customer, db_items
+    return db_gate, db_requirements
 
 
 # def update_order_service(

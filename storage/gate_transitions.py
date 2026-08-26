@@ -5,7 +5,7 @@ from sqlmodel import Session, select, col
 from models import Gate, GateStateTransition
 
 
-def add_gate__state_transition_record(
+def add_gate_state_transition_record(
     *,
     gate_id: int,
     actor_user_id: int,

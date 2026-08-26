@@ -2,26 +2,28 @@ from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
 from models import (Gate, 
-                    GateStateTransition,OrderItem, OrderUpdate,  GateStatus, 
+                    GateStateTransition, OrderUpdate,  GateStatus, 
                     OrderSortBy, OrderSortDirection)
 
 from typing import Any
 
 
 
-def add_order_record(
+def add_gate_record(
     *,
     organization_id: int,
+    gate_type: str,
     status: str,
     session: Session,
 ) -> Gate:
-    """Create and stage a new Order for persistence.
+    """Create and stage a new Gate for persistence.
 
-    Order model defaults initialize created_at and updated_at.
+    Gate model defaults initialize created_at and updated_at.
     Does not commit, rollback, or refresh.
     """
     db_gate = Gate(
         organization_id=organization_id,
+        gate_type=gate_type,
         status=status,
     )
 

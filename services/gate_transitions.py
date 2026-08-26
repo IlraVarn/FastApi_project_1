@@ -5,83 +5,83 @@ from sqlmodel import Session
 
 from errors import (
     DataIntegrityError,
-    InvalidOrderStateTransitionError,
-    OrderNotFoundError,
+    InvalidGateStateTransitionError,
+    GateNotFoundError,
     RejectionReasonRequiredError
 )
-from models import Order, OrderStatus
-from storage.order_transitions import add_order_transition_record
-from storage.orders import (
-    get_active_order_by_id,
-    update_order_status_record,
+from models import Gate, GateStatus
+from storage.gate_transitions import add_gate_state_transition_record
+from storage.gates import (
+    get_active_gate_by_id,
+    update_gate_status_record,
 )
 from tenancy.context import TenantContext
 
 
-ALLOWED_ORDER_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
-    OrderStatus.DRAFT: {
-        OrderStatus.SUBMITTED,
+ALLOWED_GATE_TRANSITIONS: dict[GateStatus, set[GateStatus]] = {
+    GateStatus.DRAFT: {
+        GateStatus.SUBMITTED,
     },
-    OrderStatus.SUBMITTED: {
-        OrderStatus.APPROVED,
-        OrderStatus.REJECTED,
+    GateStatus.SUBMITTED: {
+        GateStatus.APPROVED,
+        GateStatus.REJECTED,
     },
-    OrderStatus.APPROVED: set(),
-    OrderStatus.REJECTED: {
-        OrderStatus.DRAFT,
+    GateStatus.APPROVED: set(),
+    GateStatus.REJECTED: {
+        GateStatus.DRAFT,
     },
 }
 
 
-def transition_order_state_service(
+def transition_gate_state_service(
     *,
     tenant: TenantContext,
-    order_id: int,
-    new_status: OrderStatus,
+    gate_id: int,
+    new_status: GateStatus,
     reason: str | None,
     session: Session,
-) -> Order:
-    db_order = get_active_order_by_id(
-        order_id=order_id,
+) -> Gate:
+    db_gate = get_active_gate_by_id(
+        gate_id=gate_id,
         organization_id=tenant.organization_id,
         session=session,
     )
 
-    if db_order is None:
-        raise OrderNotFoundError()
+    if db_gate is None:
+        raise GateNotFoundError()
 
     try:
-        current_status = OrderStatus(db_order.status)
+        current_status = GateStatus(db_gate.status)
 
     except ValueError as error:
         raise DataIntegrityError() from error
 
-    allowed_next_states = ALLOWED_ORDER_TRANSITIONS[current_status]
+    allowed_next_states = ALLOWED_GATE_TRANSITIONS[current_status]
 
     if new_status not in allowed_next_states:
-        raise InvalidOrderStateTransitionError()
+        raise InvalidGateStateTransitionError()
 
     changed_at = datetime.now(UTC)
 
     if (
-        new_status == OrderStatus.REJECTED
+        new_status == GateStatus.REJECTED
         and reason is None
     ):
         raise RejectionReasonRequiredError()
     
-    if db_order.id is None:
+    if db_gate.id is None:
         raise DataIntegrityError()
 
     try:
-        update_order_status_record(
-            db_order=db_order,
+        update_gate_status_record(
+            db_gate=db_gate,
             new_status=new_status.value,
             changed_at=changed_at,
             session=session,
         )
 
-        add_order_transition_record(
-            order_id=db_order.id,
+        add_gate_state_transition_record(
+            gate_id=db_gate.id,
             actor_user_id=tenant.user_id,
             previous_status=current_status.value,
             new_status=new_status.value,
@@ -100,8 +100,8 @@ def transition_order_state_service(
         session.rollback()
         raise
 
-    session.refresh(db_order)
+    session.refresh(db_gate)
 
-    return db_order
+    return db_gate
 
 

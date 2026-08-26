@@ -18,7 +18,7 @@ from storage.customers import (get_customer_by_email,
                                add_customer_record,
                                list_customer_records)
 
-from storage.orders import list_orders_by_customer_id
+from storage.gates import list_orders_by_customer_id
 from typing import Literal
 
 
