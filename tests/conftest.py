@@ -9,15 +9,15 @@ import models  # keeps SQLModel metadata aware of tables
 from db import get_session
 from main import app
 
-from services.customers import create_customer_service
-from services.gates import create_order_service
-from services.items import create_item_service
-from models import (CustomerCreate, 
-                    OrderCreate, 
-                    OrderItemCreate, 
-                    ItemForOrderWithItemsCreate,
-                    Order,
-                    User)
+# from services.customers import create_customer_service
+# from services.gates import create_order_service
+# from services.requirements import create_item_service
+# from models import (CustomerCreate, 
+#                     OrderCreate, 
+#                     OrderItemCreate, 
+#                     ItemForOrderWithItemsCreate,
+#                     Order,
+#                     User)
 
 from typing import Literal
 

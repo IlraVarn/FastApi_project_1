@@ -44,6 +44,7 @@ class RejectionReasonRequiredError(AppError):
 
 
 
-# class CustomerNotFoundError(AppError):
-#     default_detail = "customer not found"
 
+
+class GateArchiveNotAllowedError(AppError):
+    default_detail = "draft gate cannot be archived"

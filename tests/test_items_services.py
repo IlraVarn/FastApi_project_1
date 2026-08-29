@@ -4,7 +4,7 @@ from errors import (ConflictError, ItemNotFoundError,
                     DataIntegrityError)
 
 from models import OrderItemCreate
-from services.items import create_item_service, list_items_service
+from services.requirements import create_item_service, list_items_service
 
 def test_create_item_service_success(db_session, db_order):
 

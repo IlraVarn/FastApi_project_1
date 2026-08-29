@@ -20,24 +20,7 @@ from models import (Gate,
     #                 Organization, OrganizationPublic)
 from sqlmodel import col
 
-#customer helpers
-# def to_customer_public(db_customer: Customer)-> CustomerPublic:
-#     assert db_customer.id is not None
 
-#     return CustomerPublic(
-#         id=db_customer.id,
-#         name= db_customer.name,
-#         email=db_customer.email
-#     )
-
-# def to_customer_public_list(db_customers: list[Customer]
-#                             )-> list[CustomerPublic]:
-#     public_customers = []
-#     for db_customer in db_customers:
-#         public_customer = to_customer_public(db_customer)
-#         public_customers.append(public_customer)
-
-#     return public_customers
 
 
 def to_gate_public(db_gate: Gate)-> GatePublic:
@@ -53,6 +36,17 @@ def to_gate_public(db_gate: Gate)-> GatePublic:
         archived_at=db_gate.archived_at,
         reference=db_gate.reference
     )
+
+
+def to_gate_public_list(db_gates: list[Gate]
+                        )-> list[GatePublic]:
+    public_gates = []
+
+    for db_gate in db_gates:
+        public_gate = to_gate_public(db_gate)
+        public_gates.append(public_gate)
+
+    return public_gates
 
 
 
@@ -80,7 +74,6 @@ def to_gate_with_requirements_public(
         reference=db_gate.reference,
         requirements=public_requirements
     )
-
 
 
 def to_requirement_public_list(
@@ -118,54 +111,4 @@ def to_organization_public(db_organization: Organization) -> OrganizationPublic:
 
 
 
-
-
-
-# def to_order_public_list(
-#         db_orders: list[Order]
-#         )-> list[OrderPublic]:
-    
-#     public_orders=[]
-#     for db_order in db_orders:
-#         public_order= to_order_public(db_order)
-#         public_orders.append(public_order)
-
-#     return public_orders
-
-
-
-
-
-
-
-# def to_customer_with_orders_public(
-#     db_customer: Customer,
-#     db_orders: list[Order],
-# ) -> CustomerWithOrdersPublic:
-#     """Convert persisted customer and order records 
-#     to the public response."""
-
-
-#     public_orders: list[OrderSummaryPerCustomerPublic] = []
-
-#     for db_order in db_orders:
-#         assert db_order.id is not None
-
-#         public_order = OrderSummaryPerCustomerPublic(
-#             id=db_order.id,
-#             created_at=db_order.created_at,
-#             total_cents=db_order.total_cents,
-#             status=db_order.status,
-#         )
-
-#         public_orders.append(public_order)
-
-#     assert db_customer.id is not None
-
-#     return CustomerWithOrdersPublic(
-#         id=db_customer.id,
-#         name=db_customer.name,
-#         email=db_customer.email,
-#         orders=public_orders,
-#     )
 

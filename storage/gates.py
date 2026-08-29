@@ -2,18 +2,22 @@ from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
 from models import (Gate, 
-                    GateStateTransition, OrderUpdate,  GateStatus, 
-                    OrderSortBy, OrderSortDirection)
+                    GateStateTransition,  
+                    GateStatus, 
+                    GateSortBy, 
+                    GateSortDirection,
+                    GateType,
+                    GATE_SORT_COLUMNS,
+                    )
 
 from typing import Any
-
 
 
 def add_gate_record(
     *,
     organization_id: int,
-    gate_type: str,
-    status: str,
+    gate_type: GateType,
+    status: GateStatus,
     session: Session,
 ) -> Gate:
     """Create and stage a new Gate for persistence.
@@ -23,8 +27,8 @@ def add_gate_record(
     """
     db_gate = Gate(
         organization_id=organization_id,
-        gate_type=gate_type,
-        status=status,
+        gate_type=gate_type.value,
+        status=status.value,
     )
 
     session.add(db_gate)
@@ -39,7 +43,7 @@ def get_active_gate_by_id(
     session: Session,
 ) -> Gate | None:
 
-    """Return an active Order by ID, or None if missing or archived."""
+    """Return an active Gate by ID, or None if missing or archived."""
 
     statement = (
         select(Gate)
@@ -48,6 +52,25 @@ def get_active_gate_by_id(
             Gate.organization_id == organization_id,
             col(Gate.archived_at).is_(None),
         ))
+
+    return session.exec(statement).first()
+
+
+def get_gate_by_id_include_archived(
+    *,
+    gate_id: int,
+    organization_id: int,
+    session: Session,
+) -> Gate | None:
+
+    """Return Gate by ID, include archived."""
+
+    statement = (
+        select(Gate)
+        .where(
+        col(Gate.id) == gate_id,
+        col(Gate.organization_id == organization_id,
+        )))
 
     return session.exec(statement).first()
 
@@ -68,159 +91,149 @@ def update_gate_status_record(
     return db_gate
 
 
-
-
-
-# def get_order_by_id_include_archived(
-#     *,
-#     order_id: int,
-#     session: Session,
-#     ) -> Order | None:
+def list_active_gates(
+        *,
+        session: Session,    
+        gate_type: GateType | None,          
+        status: GateStatus | None,
+        sort_by: GateSortBy,
+        sort_dir: GateSortDirection,
+        offset: int,
+        limit: int,
+        organization_id: int
+    )-> list[Gate]:
+    """Return filtered, sorted, active gates within 
+        one result page."""
     
-#     return session.get(Order, order_id)
+    statement = (select(Gate)
+        .where(
+            Gate.organization_id == organization_id,
+            col(Gate.archived_at).is_(None)))
+
+    if status is not None:
+        statement = statement.where(
+            col(Gate.status == status.value))
+
+    if gate_type is not None:
+        statement = statement.where(
+            Gate.gate_type == gate_type.value)
+
+    sort_column = GATE_SORT_COLUMNS[sort_by]
+
+    if sort_dir == "desc":
+        primary_sort = desc(sort_column)
+        tie_breaker = desc(col(Gate.id))
+    else:
+        primary_sort = asc(sort_column)
+        tie_breaker = asc(col(Gate.id))
+
+    if sort_by == "id":
+        statement = statement.order_by(primary_sort)
+    else:
+        statement = statement.order_by(
+            primary_sort, 
+            tie_breaker)
+
+    statement = statement.offset(offset).limit(limit)
+
+    db_gates = list(session.exec(statement).all())
+
+    return db_gates
 
 
-# def list_active_orders(
+def count_active_gates_by_filter(
+        *,
+        session: Session,    
+        gate_type: GateType | None,          
+        status: GateStatus | None,
+        organization_id: int
+) -> int:
+    """Return the number of active gates by filter."""
+
+    statement = (
+        select(
+            func.count(col(Gate.id)),
+        )
+         .where(
+            Gate.organization_id == organization_id,
+            col(Gate.archived_at).is_(None)))
+
+    if status is not None:
+        statement = statement.where(
+            col(Gate.status == status.value))
+
+    if gate_type is not None:
+        statement = statement.where(
+            Gate.gate_type == gate_type.value)
+
+    total_count = session.exec(statement).one()
+
+    return total_count
+
+
+def update_gate_patch(
+    *,
+    db_gate: Gate,
+    update_data: dict[str, Any],
+    session: Session,
+) -> Gate:
+    """Apply validated fields to an existing Gate,
+    set updated_at to the current UTC time,
+    and stage it for persistence.
+
+    Does not commit, rollback, or refresh.
+    """
+
+    db_gate.sqlmodel_update(update_data)
+    db_gate.updated_at= datetime.now(UTC)
+    session.add(db_gate)
+
+    return db_gate
+
+
+def archive_gate_record(
+    *,
+    db_gate: Gate,
+    session: Session,
+) -> Gate:
+    
+    """Set an Gate's archive timestamp and stage it for persistence.
+
+    Does not commit, rollback, refresh, or decide whether archiving is allowed.
+    """
+
+    now = datetime.now(UTC)
+
+    db_gate.archived_at = now
+    db_gate.updated_at = now
+
+    session.add(db_gate)
+
+    return db_gate
+
+
+# def group_active_gates_by_filter(
 #         *,
-#         session: Session,               
-#         status: OrderStatus | None,
-#         sort_by: OrderSortBy,
-#         sort_dir: OrderSortDirection,
-#         offset: int,
-#         limit: int
-#     )-> list[Order]:
-#     """Return filtered, sorted, active orders within 
-#         one result page."""
-    
-#     statement = select(Order).where(
-#         col(Order.archived_at).is_(None))
-
-#     if status is not None:
-#         statement = statement.where(Order.status == status)
-
-#     sort_column = ORDER_SORT_COLUMNS[sort_by]
-
-#     if sort_dir == "desc":
-#         primary_sort = desc(sort_column)
-#         tie_breaker = desc(col(Order.id))
-#     else:
-#         primary_sort = asc(sort_column)
-#         tie_breaker = asc(col(Order.id))
-
-#     if sort_by == "id":
-#         statement = statement.order_by(primary_sort)
-#     else:
-#         statement = statement.order_by(primary_sort, tie_breaker)
-
-#     statement = statement.offset(offset).limit(limit)
-
-#     db_orders = list(session.exec(statement).all())
-
-#     return db_orders
-
-
-# def list_orders_by_customer_id(
-#     customer_id: int,
-#     session: Session,
-# ) -> list[Order]:
-#     """Return all orders belonging to one customer.
-#     Orders are returned newest first, with ID as the stable tie-breaker.
-#     """
-
-#     statement = (
-#         select(Order)
-#         .where(
-#             col(Order.archived_at).is_(None))
-#             .order_by(
-#                 desc(col(Order.created_at)),
-#                 desc(col(Order.id)),
-#         )
-#     )
-
-#     result = session.exec(statement)
-
-#     return list(result.all())
-
-
-# def archive_order_record(
-#     *,
-#     db_order: Order,
-#     session: Session,
-# ) -> Order:
-    
-#     """Set an Order's archive timestamp and stage it for persistence.
-
-#     Does not commit, rollback, refresh, or decide whether archiving is allowed.
-#     """
-
-#     now = datetime.now(UTC)
-
-#     db_order.archived_at = now
-#     db_order.updated_at = now
-
-#     session.add(db_order)
-
-#     return db_order
-
-
-# #PATCH ORDER
-
-# def update_order(
-#         *,
-#         db_order: Order,
-#         total_cents: int,
-#         status: str,
-#         session: Session,
-#     ) -> Order:
-
-#     db_order.total_cents = total_cents
-#     db_order.status = status
-
-
-#     session.add(db_order)
-#     return db_order
-
-
-# def update_order_patch(
-#     *,
-#     db_order: Order,
-#     update_data: dict[str, Any],
-#     session: Session,
-# ) -> Order:
-#     """Apply validated fields to an existing Order,
-#     set updated_at to the current UTC time,
-#     and stage it for persistence.
-
-#     Does not commit, rollback, or refresh.
-#     """
-
-#     db_order.sqlmodel_update(update_data)
-#     db_order.updated_at= datetime.now(UTC)
-#     session.add(db_order)
-
-#     return db_order
-
-
-# #COUNT
-# def count_active_orders_by_status(
-#     *,
-#     session: Session,
+#         session: Session,    
+#         gate_type: GateType | None,          
+#         status: GateStatus | None,
+#         organization_id: int
 # ) -> list[tuple[str, int]]:
-#     """Return the number of active orders in each status."""
+#     """Return the number of active gates in each status."""
 
 #     statement = (
 #         select(
-#             col(Order.status),
-#             func.count(col(Order.id)),
+#             col(Gate.status),
+#             func.count(col(Gate.id)),
 #         )
 #         .where(
-#             col(Order.archived_at).is_(None),
+#             col(Gate.archived_at).is_(None),
 #         )
 #         .group_by(
-#             col(Order.status),
+#             col(Gate.status),
 #         )
 #         .order_by(
-#             col(Order.status),
+#             col(Gate.status),
 #         )
 #     )
 

@@ -26,7 +26,7 @@ from services.gates import (create_order_service,
                              archive_order_service,
                              count_active_orders_by_status_service,
                              )
-from services.items import create_item_service
+from services.requirements import create_item_service
 
 
 def test_create_order_service_success(db_session, db_customer):

@@ -12,44 +12,53 @@ from fastapi import (APIRouter,
 from sqlmodel import Session
 
 from db import get_session
-from errors import (ConflictError, 
-                    GateNotFoundError, 
-                    DataIntegrityError,
-                    InvalidGateUpdateError,
-                    InvalidGateStateTransitionError,
-                    InvalidGateStateTransitionError,
-                    RejectionReasonRequiredError)
-from mappers import (
-    to_gate_with_requirements_public,
-    to_gate_public)
 
 from models import (
-     GatePublic,
-     GateType,
-     GateStateTransitionRequest,
-     GateCreateRequest,
-     GateWithRequirementsPublic,
-     GateRequirementPublic,
-     GateStateTransition,
-     GateListPublic
-     )
+    GatePublic,
+    GateStatus,
+    GateType,
+    GateStateTransitionRequest,
+    GateCreateRequest,
+    GatePatchRequest,
+    GateWithRequirementsPublic,
+    GateRequirementPublic,
+    GateStateTransition,
+    GateListPublicWithCount,
+    GateSortDirection,
+    GateSortBy,
+    
+    )
 
 from services.gates import (
     create_gate_with_requirements_service,
     get_gate_with_requirements_service,
+    list_active_gates_with_count_service,
+    count_active_gates_by_filter,
+    update_gate_patch_service,
+    archive_gate_service,
     )
 
-from services.gate_transitions import transition_gate_state_service
+from services.gate_transitions import (
+    transition_gate_state_service,
+    )
 
+from errors import (
+    ConflictError, 
+    GateNotFoundError, 
+    DataIntegrityError,
+    InvalidGateUpdateError,
+    InvalidGateStateTransitionError,
+    InvalidGateStateTransitionError,
+    RejectionReasonRequiredError,
+    GateArchiveNotAllowedError,
+    )
 
-#     get_order_detail_with_items_service,
-#     list_active_orders_service,
-#     update_order_service,
-#     create_order_with_items_service,
-#     update_order_patch_service,
-#     archive_order_service,
-#     count_active_orders_by_status_service,
-# )
+from mappers import (
+    to_gate_with_requirements_public,
+    to_gate_public,
+    to_gate_public_list,
+    )
+
 
 router = APIRouter(prefix="/organizations/{organization_id}/gates", 
                    tags=["gates"])
@@ -133,11 +142,11 @@ def transition_gate_state(
     return to_gate_public(db_gate)
 
 
-
+#GET AND LIST
 @router.get("/{gate_id}", 
             response_model=GateWithRequirementsPublic
             )
-def read_gate(
+def get_gate_with_requirements(
     gate_id: int,
     tenant: TenantContext = 
         Depends(get_tenant_context),
@@ -163,28 +172,126 @@ def read_gate(
         db_requirements)
 
 
+@router.get("", 
+            response_model=GateListPublicWithCount)
+def list_gates_with_count(
+    gate_type: GateType | None = None,
+    status: GateStatus | None = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    session: Session = Depends(get_session),
+    sort_by: GateSortBy = 'created_at',
+    sort_dir: GateSortDirection = 'desc',
+    tenant: TenantContext =
+        Depends(get_tenant_context)
+) -> GateListPublicWithCount:
+    
+    db_gates, db_gates_count = list_active_gates_with_count_service(
+        gate_type=gate_type,
+        status=status,
+        offset=offset,
+        limit=limit,
+        session=session,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        tenant=tenant
+    )
+
+    public_gates = to_gate_public_list(db_gates)
+
+    return GateListPublicWithCount(
+        data=public_gates,
+        count=db_gates_count)
 
 
+#UPDATE    
+@router.patch(
+    "/{gate_id}",
+    response_model=GatePublic,
+)
+def patch_gate(
+    gate_id: int,
+    gate_update: GatePatchRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_session),
+) -> GatePublic:
+    """Partially update one gate and return its updated public state."""
 
-# @router.get("", 
-#             response_model=list[OrderPublic])
-# def list_orders(
-#     status: OrderStatus | None = None,
-#     offset: Annotated[int, Query(ge=0)] = 0,
-#     limit: Annotated[int, Query(ge=1, le=100)] = 20,
-#     session: Session = Depends(get_session),
-#     sort_by: OrderSortBy = 'created_at',
-#     sort_dir: OrderSortDirection = 'desc'
-# ):
-#     db_orders = list_active_orders_service(
-#         status=status,
-#         offset=offset,
-#         limit=limit,
-#         session=session,
-#         sort_by=sort_by,
-#         sort_dir=sort_dir,
-#     )
+    #convert request model into a dict
+    update_data = gate_update.model_dump(
+            exclude_unset=True,
+        )
+    
+    try:
+        db_gate = update_gate_patch_service(
+            gate_id=gate_id,
+            tenant=tenant,
+            update_data=update_data,
+            session=session,
+        )
 
-#     return to_order_public_list(db_orders)
+    except GateNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=error.detail,
+        ) from error
+
+    except InvalidGateUpdateError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=error.detail,
+        ) from error
+
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from error
+
+    return to_gate_public(
+        db_gate=db_gate,
+
+    )
+
+
+#DELETE
+
+@router.delete("/{gate_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_gate(
+    gate_id: int,
+    tenant: TenantContext =
+            Depends(get_tenant_context),
+    session: Session = Depends(get_session),
+) -> Response:
+    """Archive one gate and return no response body."""
+
+    try:
+        archive_gate_service(
+            gate_id=gate_id,
+            tenant=tenant,
+            session=session,
+        )
+
+    except GateNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=error.detail,
+        ) from error
+
+    except GateArchiveNotAllowedError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=error.detail
+            ) from error
+    
+    except DataIntegrityError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from error
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
 
 

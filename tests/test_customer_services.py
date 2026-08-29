@@ -1,216 +1,216 @@
-import pytest 
-from errors import DuplicateCustomerEmailError, CustomerNotFoundError
-from models import CustomerCreate
-from services.customers import (create_customer_service,
-                                read_customer_service,
-                                list_customers_service,
-                                get_customer_with_orders_service)
+# import pytest 
+# from errors import DuplicateCustomerEmailError, CustomerNotFoundError
+# from models import CustomerCreate
+# from services.customers import (create_customer_service,
+#                                 read_customer_service,
+#                                 list_customers_service,
+#                                 get_customer_with_orders_service)
 
 
-#SUCCESS TESTS
+# #SUCCESS TESTS
 
-def test_create_customer_service_success(db_session):
+# def test_create_customer_service_success(db_session):
 
-    db_customer = create_customer_service(
-        name="Olga",
-        email="x.com",
-        session=db_session,
-    )
+#     db_customer = create_customer_service(
+#         name="Olga",
+#         email="x.com",
+#         session=db_session,
+#     )
 
-    assert db_customer.id is not None
-    assert db_customer.name == 'Olga'
-    assert db_customer.email == 'x.com'
-    assert db_customer.internal_note is None
-
-
-def test_read_customer_service_success(db_session, db_customer):
-
-    customer_id = db_customer.id
-
-    returned_customer = read_customer_service(customer_id, db_session)
-
-    assert returned_customer.id == customer_id
-    assert returned_customer.name == db_customer.name
-    assert returned_customer.email == db_customer.email
-    assert returned_customer.internal_note is None
+#     assert db_customer.id is not None
+#     assert db_customer.name == 'Olga'
+#     assert db_customer.email == 'x.com'
+#     assert db_customer.internal_note is None
 
 
-def test_list_customers_service_all_customers_success(db_session, make_db_customer):
+# def test_read_customer_service_success(db_session, db_customer):
+
+#     customer_id = db_customer.id
+
+#     returned_customer = read_customer_service(customer_id, db_session)
+
+#     assert returned_customer.id == customer_id
+#     assert returned_customer.name == db_customer.name
+#     assert returned_customer.email == db_customer.email
+#     assert returned_customer.internal_note is None
+
+
+# def test_list_customers_service_all_customers_success(db_session, make_db_customer):
     
-    first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
-    second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
+#     first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
+#     second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
 
-    returned_customers = list_customers_service(
-         name=None,
-         email=None,
-         sort_by='name',
-         sort_dir='asc',
-         offset=0,
-         limit=2,
-         session=db_session
-    )
+#     returned_customers = list_customers_service(
+#          name=None,
+#          email=None,
+#          sort_by='name',
+#          sort_dir='asc',
+#          offset=0,
+#          limit=2,
+#          session=db_session
+#     )
 
-    assert len(returned_customers) == 2
-    assert returned_customers[0].id == first_customer.id
+#     assert len(returned_customers) == 2
+#     assert returned_customers[0].id == first_customer.id
 
 
-def test_list_customers_filter_by_name_success(db_session, make_db_customer):
+# def test_list_customers_filter_by_name_success(db_session, make_db_customer):
     
-    first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
-    second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
+#     first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
+#     second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
 
-    returned_customers = list_customers_service(
-         name='Ana',
-         email=None,
-         sort_by='name',
-         sort_dir='asc',
-         offset=0,
-         limit=2,
-         session=db_session
-    )
+#     returned_customers = list_customers_service(
+#          name='Ana',
+#          email=None,
+#          sort_by='name',
+#          sort_dir='asc',
+#          offset=0,
+#          limit=2,
+#          session=db_session
+#     )
 
-    assert len(returned_customers) == 1
-    assert returned_customers[0].id == first_customer.id
-    assert returned_customers[0].name == first_customer.name
+#     assert len(returned_customers) == 1
+#     assert returned_customers[0].id == first_customer.id
+#     assert returned_customers[0].name == first_customer.name
 
 
-def test_list_customers_filter_by_email_success(db_session, make_db_customer):
+# def test_list_customers_filter_by_email_success(db_session, make_db_customer):
     
-    first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
-    second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
+#     first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
+#     second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
 
-    returned_customers = list_customers_service(
-         name=None,
-         email='olga@x.com',
-         sort_by='name',
-         sort_dir='asc',
-         offset=0,
-         limit=2,
-         session=db_session
-    )
+#     returned_customers = list_customers_service(
+#          name=None,
+#          email='olga@x.com',
+#          sort_by='name',
+#          sort_dir='asc',
+#          offset=0,
+#          limit=2,
+#          session=db_session
+#     )
 
-    assert len(returned_customers) == 1
-    assert returned_customers[0].id == second_customer.id
-    assert returned_customers[0].email == second_customer.email
-
-
-def test_list_customers_paginates_success(db_session, make_db_customer):
-
-    first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
-    second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
-    third_customer = make_db_customer(name = 'Bob', email= 'bob@x.com')
+#     assert len(returned_customers) == 1
+#     assert returned_customers[0].id == second_customer.id
+#     assert returned_customers[0].email == second_customer.email
 
 
-    returned_customers = list_customers_service(
-         name=None,
-         email=None,
-         sort_by='name',
-         sort_dir='desc',
-         offset=1,
-         limit=1,
-         session=db_session
-    )
+# def test_list_customers_paginates_success(db_session, make_db_customer):
 
-    assert len(returned_customers) == 1
-    assert returned_customers[0].id == third_customer.id
-    assert returned_customers[0].name == third_customer.name
+#     first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
+#     second_customer = make_db_customer(name = 'Olga', email= 'olga@x.com')
+#     third_customer = make_db_customer(name = 'Bob', email= 'bob@x.com')
 
 
-def test_list_customers_no_matches_returns_empty_list_success(db_session, make_db_customer):
+#     returned_customers = list_customers_service(
+#          name=None,
+#          email=None,
+#          sort_by='name',
+#          sort_dir='desc',
+#          offset=1,
+#          limit=1,
+#          session=db_session
+#     )
+
+#     assert len(returned_customers) == 1
+#     assert returned_customers[0].id == third_customer.id
+#     assert returned_customers[0].name == third_customer.name
+
+
+# def test_list_customers_no_matches_returns_empty_list_success(db_session, make_db_customer):
         
-    first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
+#     first_customer = make_db_customer(name = 'Ana', email= 'ana@x.com')
 
-    returned_customers = list_customers_service(
-         name='Olga',
-         email=None,
-         sort_by='name',
-         sort_dir='desc',
-         offset=1,
-         limit=1,
-         session=db_session
-    )
+#     returned_customers = list_customers_service(
+#          name='Olga',
+#          email=None,
+#          sort_by='name',
+#          sort_dir='desc',
+#          offset=1,
+#          limit=1,
+#          session=db_session
+#     )
 
-    assert len(returned_customers) == 0
-    assert returned_customers == []
-
-
-def test_get_customer_with_orders_service_success(db_session, db_customer, make_db_order):
-
-    customer_id = db_customer.id
-
-    first_order = make_db_order(total_cents=10, status='paid')
-    second_order = make_db_order(total_cents=20, status='pending')
+#     assert len(returned_customers) == 0
+#     assert returned_customers == []
 
 
-    returned_customer, returned_orders = get_customer_with_orders_service(
-        customer_id, db_session)
+# def test_get_customer_with_orders_service_success(db_session, db_customer, make_db_order):
 
-    assert returned_customer.id == customer_id
-    assert returned_customer.name == db_customer.name
-    assert returned_customer.email == db_customer.email
-    assert returned_customer.internal_note is None
+#     customer_id = db_customer.id
 
-    assert len(returned_orders) == 2
-
-    assert returned_orders[0].id == second_order.id
-    assert returned_orders[1].id == first_order.id
-    assert returned_orders[0].total_cents == 20
-    assert returned_orders[0].status == 'pending'
-    assert returned_orders[1].total_cents == 10
-    assert returned_orders[1].status == 'paid'
+#     first_order = make_db_order(total_cents=10, status='paid')
+#     second_order = make_db_order(total_cents=20, status='pending')
 
 
-def test_get_customer_with_orders_service_returns_empty_list_success(
-        db_session, db_customer, make_db_order
-        ):
+#     returned_customer, returned_orders = get_customer_with_orders_service(
+#         customer_id, db_session)
 
-    customer_id = db_customer.id
+#     assert returned_customer.id == customer_id
+#     assert returned_customer.name == db_customer.name
+#     assert returned_customer.email == db_customer.email
+#     assert returned_customer.internal_note is None
 
+#     assert len(returned_orders) == 2
 
-    returned_customer, returned_orders = get_customer_with_orders_service(
-        customer_id, db_session)
-
-    assert returned_customer.id == customer_id
-    assert returned_customer.name == db_customer.name
-    assert returned_customer.email == db_customer.email
-    assert returned_customer.internal_note is None
-
-    assert len(returned_orders) == 0
-
-    assert returned_orders == []
+#     assert returned_orders[0].id == second_order.id
+#     assert returned_orders[1].id == first_order.id
+#     assert returned_orders[0].total_cents == 20
+#     assert returned_orders[0].status == 'pending'
+#     assert returned_orders[1].total_cents == 10
+#     assert returned_orders[1].status == 'paid'
 
 
+# def test_get_customer_with_orders_service_returns_empty_list_success(
+#         db_session, db_customer, make_db_order
+#         ):
 
-#FAILURE TESTS
-def test_create_customer_service_duplicate_email(db_session, db_customer):
-
-    with pytest.raises(DuplicateCustomerEmailError) as captured_error:
-        create_customer_service(
-            name='Olga',
-            email=db_customer.email,
-            session=db_session,
-        )
-
-    assert captured_error.value.detail == "customer email already exists"
+#     customer_id = db_customer.id
 
 
-def test_read_customer_service_customer_not_found(db_session):
-    with pytest.raises(CustomerNotFoundError) as captured_error:
-        read_customer_service(
-            customer_id=999,
-            session=db_session,
-        )
+#     returned_customer, returned_orders = get_customer_with_orders_service(
+#         customer_id, db_session)
 
-    assert captured_error.value.detail == "customer not found"
+#     assert returned_customer.id == customer_id
+#     assert returned_customer.name == db_customer.name
+#     assert returned_customer.email == db_customer.email
+#     assert returned_customer.internal_note is None
+
+#     assert len(returned_orders) == 0
+
+#     assert returned_orders == []
 
 
-def test_get_customer_with_orders_service_customer_not_found(
-        db_session):
 
-    with pytest.raises(CustomerNotFoundError) as captured_error:
-        get_customer_with_orders_service(
-        999, db_session)
+# #FAILURE TESTS
+# def test_create_customer_service_duplicate_email(db_session, db_customer):
 
-    assert captured_error.value.detail == "customer not found"
+#     with pytest.raises(DuplicateCustomerEmailError) as captured_error:
+#         create_customer_service(
+#             name='Olga',
+#             email=db_customer.email,
+#             session=db_session,
+#         )
+
+#     assert captured_error.value.detail == "customer email already exists"
+
+
+# def test_read_customer_service_customer_not_found(db_session):
+#     with pytest.raises(CustomerNotFoundError) as captured_error:
+#         read_customer_service(
+#             customer_id=999,
+#             session=db_session,
+#         )
+
+#     assert captured_error.value.detail == "customer not found"
+
+
+# def test_get_customer_with_orders_service_customer_not_found(
+#         db_session):
+
+#     with pytest.raises(CustomerNotFoundError) as captured_error:
+#         get_customer_with_orders_service(
+#         999, db_session)
+
+#     assert captured_error.value.detail == "customer not found"
 
 

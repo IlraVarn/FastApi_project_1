@@ -18,10 +18,14 @@ from enum import Enum
 # MembershipPublic
 
 # GateStatus
+# GateType
 # Gate
-# GatePublic
-# GateWithRequirementsPublic(GatePublic)
 # GateCreateRequest
+# GatePatchRequesr
+# GatePublic
+# GateListPublicWithCount
+# GateWithRequirementsPublic(GatePublic)
+
 
 # GateRequirementType
 # GateRequirement
@@ -190,6 +194,13 @@ class GateCreateRequest(SQLModel):
     )
 
 
+class GatePatchRequest(SQLModel):
+    #extra= forbid sends back 422 if clent sends additional field.
+    #rejects fields the client cannot mutate
+    model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
+    reference: str | None = Field(default=None, min_length=1)
+
+
 class GatePublic(SQLModel):
     id: int
     organization_id: int
@@ -201,7 +212,7 @@ class GatePublic(SQLModel):
     reference: str | None
 
 
-class GateListPublic(SQLModel):
+class GateListPublicWithCount(SQLModel):
     data: list[GatePublic]
     count: int
 
@@ -393,131 +404,18 @@ class GateStateTransitionRequest(SQLModel):
         return value
 
 
-#OLD MODELS
-
-class OrderUpdatePatch(SQLModel):
-    """ extra= forbid sends back 422 if clent sends additional field.
-    rejects fields the client cannot mutate"""
-    model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
-
-    total_cents: int | None = Field(default=None, ge=0)
-    status: OrderStatus | None = None
 
 
-class OrderUpdate(SQLModel):
-    total_cents: int = Field(ge=0)
-    status: OrderStatus
+#GATES SORT
 
-class OrderStatusCountPublic(SQLModel):
-    status: str
-    count: int
-
-    
-class OrderWithItemsCreate(SQLModel):
-    customer_id: int = Field(ge=1)
-    status: Literal['paid', 'pending']
-    items: list[ItemForOrderWithItemsCreate] = Field(min_length=1)
+GateSortBy = Literal["created_at", "status", "id"]
+GateSortDirection = Literal["asc", "desc"]
 
 
-class OrderPublic(SQLModel):
-    id: int
-    created_at: datetime
-    total_cents: int
-    status: str
-
-
-# class OrderDetailWithItemsPublic(SQLModel):
-#     id: int
-#     created_at: datetime
-#     customer: CustomerPublic
-#     total_cents: int
-#     items: list[OrderItemPublic]    
-#ITEMS
-# class OrderItem(SQLModel, table=True):
-#     __tablename__: ClassVar[str] = "order_items"
-
-#     __table_args__ = (
-#         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
-#         CheckConstraint("unit_price_cents >= 0", name="ck_order_item_unit_price_nonnegative"),
-#         CheckConstraint("length(trim(product_name)) > 0", name="ck_product_name_non_empty"),
-#     )
-
-#     id: int | None = Field(default=None, primary_key=True)
-#     order_id: int = Field(
-#         foreign_key="orders.id", 
-#         nullable=False,
-#         index=True)
-#     product_name: str = Field(nullable=False)
-#     quantity: int = Field(nullable=False)
-#     unit_price_cents: int = Field(nullable=False)
-
-
-class OrderItemCreate(SQLModel):
-    order_id: int = Field(ge=1)
-    product_name: str = Field(min_length=1)
-    quantity: int = Field(ge=0)
-    unit_price_cents: int = Field(ge=0)
-
-    @field_validator("product_name")
-    @classmethod
-    def strip_and_reject_blank(cls, value: str) -> str:
-        value = value.strip()
-
-        if not value:
-            raise ValueError("must not be blank")
-
-        return value
-    
-
-class ItemForOrderWithItemsCreate(SQLModel):
-    product_name: str = Field(min_length=1)
-    quantity: int = Field(gt=0)
-    unit_price_cents: int = Field(ge=0)
-
-    @field_validator("product_name")
-    @classmethod
-    def strip_and_reject_blank(cls, value: str) -> str:
-        value = value.strip()
-
-        if not value:
-            raise ValueError("must not be blank")
-
-        return value
-    
-
-class OrderItemPublic(SQLModel):
-    id: int
-    order_id: int
-    product_name: str
-    quantity: int
-    unit_price_cents: int
-
-
-#JOIN RESPONSE MODELS   
-# class CustomerWithOrdersPublic(SQLModel):
-#     id: int
-#     name: str
-#     email: str
-#     orders: list[OrderSummaryPerCustomerPublic]
-
-
-# class OrderSummaryPerCustomerPublic(SQLModel):
-#     id: int
-#     created_at: datetime
-#     total_cents: int
-#     status: str
-
-
-#ORDERS SORT
-
-OrderSortBy = Literal["created_at", "total_cents", "id"]
-OrderSortDirection = Literal["asc", "desc"]
-
-
-# ORDER_SORT_COLUMNS = {
-#     "created_at": Order.created_at,
-#     "total_cents": Order.total_cents,
-#     "id": Order.id,
-# }
+GATE_SORT_COLUMNS = {
+    "created_at": Gate.created_at,
+    "status": Gate.status,
+    "id": Gate.id,
+}
 
 
