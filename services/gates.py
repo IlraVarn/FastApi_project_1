@@ -44,7 +44,6 @@ def create_gate_with_requirements_service(
 ) -> tuple[Gate, list[GateRequirement]]:
 
     try:
-
         db_gate = add_gate_record(
             organization_id=tenant.organization_id,
             gate_type=gate_type,
@@ -73,6 +72,7 @@ def create_gate_with_requirements_service(
             db_requirements.append(db_requirement)
 
         session.commit()
+
 
     except IntegrityError as error:
         session.rollback()

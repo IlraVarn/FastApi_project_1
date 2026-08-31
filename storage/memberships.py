@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 
 from models import Membership
 
-
+#used for TenantContext
 def get_active_membership_record(
     *,
     user_id: int,

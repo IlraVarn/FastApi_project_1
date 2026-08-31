@@ -43,8 +43,6 @@ class RejectionReasonRequiredError(AppError):
     default_detail = "rejection reason required"
 
 
-
-
-
 class GateArchiveNotAllowedError(AppError):
     default_detail = "draft gate cannot be archived"
+

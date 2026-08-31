@@ -13,7 +13,8 @@ from sqlmodel import Session
 
 from db import get_session
 from errors import (DataIntegrityError,
-                    UserNotFoundError)
+                    UserNotFoundError,
+                    )
 from mappers import (to_organization_public,)
 
 
@@ -25,7 +26,10 @@ from services.organizations import create_self_service_organization_service
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
+#does not perform a tenancy check. 
+#only creates org + membership if user is authorized
 
+#checks if user exists in the DB because authenticated_user 
 
 @router.post(
     "",
@@ -45,11 +49,13 @@ def create_organization(
             session=session,
         )
 
-    except UserNotFoundError as error:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        ) from error
+#redundant for the current architecture with get_authenticated_user()
+    # except UserNotFoundError as error:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED,
+    #         detail="Invalid authentication credentials",
+    #     ) from error
+
 
     except DataIntegrityError as error:
         raise HTTPException(

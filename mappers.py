@@ -9,17 +9,7 @@ from models import (Gate,
                     Organization,
                     OrganizationPublic)
 
-
-    # Gate, 
-    #                 GatePublic,
-    #                 OrderItem, 
-    #                 OrderItemPublic, 
-    #                 OrderDetailWithItemsPublic,
-    #                 OrderSummaryPerCustomerPublic,
-    #                 CustomerWithOrdersPublic,
-    #                 Organization, OrganizationPublic)
 from sqlmodel import col
-
 
 
 

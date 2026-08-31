@@ -11,6 +11,12 @@ from auth.dependencies import get_authenticated_user
 
 
 #Is this authenticated user allowed to act inside this organization?
+#returns 
+# TenantContext(
+#     user_id=1,
+#     organization_id=7,
+# )
+
 def get_tenant_context(
     organization_id: int = Path(ge=1),
     authenticated_user: AuthContext = Depends(get_authenticated_user),

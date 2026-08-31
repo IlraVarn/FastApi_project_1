@@ -1,6 +1,8 @@
 import pytest
 import os
 
+from auth.context import AuthContext
+from auth.dependencies import get_authenticated_user
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from datetime import UTC, datetime
@@ -12,12 +14,15 @@ from main import app
 # from services.customers import create_customer_service
 # from services.gates import create_order_service
 # from services.requirements import create_item_service
-# from models import (CustomerCreate, 
-#                     OrderCreate, 
-#                     OrderItemCreate, 
-#                     ItemForOrderWithItemsCreate,
-#                     Order,
-#                     User)
+from models import (
+    User,
+    Membership,
+    Organization,
+    Gate,
+    GateType,
+    GateRequirement,
+    GateEvidence,
+    )
 
 from typing import Literal
 
@@ -49,6 +54,8 @@ def auth_headers():
 def reset_test_database():
     SQLModel.metadata.drop_all(test_engine)
     SQLModel.metadata.create_all(test_engine)
+    #added line
+    app.dependency_overrides.clear()
 
     app.dependency_overrides[get_session] = override_get_session
 
@@ -69,11 +76,14 @@ def db_session():
 
 #endpoint test fixtures
 
-#CUSTOMERS
+
+
+
+#USERS
 @pytest.fixture
-def customer(client):
+def user(client):
     response = client.post(
-        "/customers",
+        "/users",
         json={
             "name": "Olga",
             "email": "olga@x.com",
@@ -84,11 +94,31 @@ def customer(client):
     return response.json()
 
 
+
 @pytest.fixture
-def make_customer(client):
-    def _make_customer(name: str, email: str):
+def authenticated_client(client, user):
+    def override_get_current_user() -> AuthContext:
+        return AuthContext(
+            user_id=user["id"],
+        )
+
+    app.dependency_overrides[get_authenticated_user] = (
+        override_get_current_user
+    )
+
+    yield client
+
+    app.dependency_overrides.pop(
+        get_authenticated_user,
+        None,
+    )
+
+
+@pytest.fixture
+def make_user(client):
+    def _make_user(name: str, email: str):
         response = client.post(
-            '/customers',
+            '/users',
             json={
                 "name": name,
                 "email": email,
@@ -97,228 +127,220 @@ def make_customer(client):
         assert response.status_code == 201
         return response.json()
     
-    return _make_customer
+    return _make_user
 
-#ORDERS
+#ORGANIZATIONS
 @pytest.fixture
-def order(client, customer):
+def organization(client, auth_headers):
     response = client.post(
-        "/orders",
+        "/organizations",
         json={
-            'customer_id': customer['id'],
-            'total_cents': 10,
-            'status': 'paid'
+            'name': 'test_organization',
         },
-        headers={
-            "Authorization": "Bearer abc123"
-        },
+        headers=auth_headers,
     )
 
     assert response.status_code == 201
     return response.json()
 
 @pytest.fixture
-def make_order(client, customer):
-    def _make_order(total_cents: int, status: Literal['paid', 'pending']):
+def make_organization(client, auth_headers):
+    def _make_organization(name: str):
         response = client.post(
-            "/orders",
+            "/organizations",
             json={
-                "customer_id": customer["id"],
-                "total_cents": total_cents,
-                "status": status,
+                'name': name,
             },
-            headers={
-            "Authorization": "Bearer abc123"
-        },
+            headers=auth_headers,
         )
 
         assert response.status_code == 201
         return response.json()
 
-    return _make_order
+    return _make_organization
 
 
-#ITEMS
-@pytest.fixture
-def item(client, order):
-    response = client.post('/items',
-         json= {
-            'order_id': order['id'],
-            'product_name': 'toy',
-            'quantity': 10,
-            'unit_price_cents': 50}
-         )
+# #ITEMS
+# @pytest.fixture
+# def item(client, order):
+#     response = client.post('/items',
+#          json= {
+#             'order_id': order['id'],
+#             'product_name': 'toy',
+#             'quantity': 10,
+#             'unit_price_cents': 50}
+#          )
     
-    assert response.status_code == 201
-    return response.json()
+#     assert response.status_code == 201
+#     return response.json()
 
-@pytest.fixture
-def make_item(client, order):
-    def _make_item(product_name: str, quantity: int, unit_price_cents: int):
-        response = client.post(
-            "/items",
-            json={
-                "order_id": order["id"],
-                "product_name": product_name,
-                "quantity": quantity,
-                "unit_price_cents": unit_price_cents,
-            },
-        )
+# @pytest.fixture
+# def make_item(client, order):
+#     def _make_item(product_name: str, quantity: int, unit_price_cents: int):
+#         response = client.post(
+#             "/items",
+#             json={
+#                 "order_id": order["id"],
+#                 "product_name": product_name,
+#                 "quantity": quantity,
+#                 "unit_price_cents": unit_price_cents,
+#             },
+#         )
 
-        assert response.status_code == 201
-        return response.json()
+#         assert response.status_code == 201
+#         return response.json()
 
-    return _make_item
-
-
-
-#SERVICE TEST FIXTURES
+#     return _make_item
 
 
-@pytest.fixture
-def db_customer(db_session):
-    return create_customer_service(
-            name="Olga",
-            email="olga@x.com",
-            session=db_session,
-    )
 
-@pytest.fixture
-def make_db_customer(db_session):
-    def _make_db_customer(name: str, email: str):
+# #SERVICE TEST FIXTURES
+
+
+# @pytest.fixture
+# def db_customer(db_session):
+#     return create_customer_service(
+#             name="Olga",
+#             email="olga@x.com",
+#             session=db_session,
+#     )
+
+# @pytest.fixture
+# def make_db_customer(db_session):
+#     def _make_db_customer(name: str, email: str):
         
-        return create_customer_service(
-            name=name,
-            email=email,
-            session=db_session
-        )
+#         return create_customer_service(
+#             name=name,
+#             email=email,
+#             session=db_session
+#         )
     
-    return _make_db_customer
+#     return _make_db_customer
 
-@pytest.fixture
-def db_user(db_session):
-    user = User(
-        email="test@example.com"
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
+# @pytest.fixture
+# def db_user(db_session):
+#     user = User(
+#         email="test@example.com"
+#     )
+#     db_session.add(user)
+#     db_session.commit()
+#     db_session.refresh(user)
+#     return user
 
-@pytest.fixture
-def db_order(db_session, db_customer, db_user):
-    return create_order_service(
-            customer_id=db_customer.id,
-            owner_id=db_user.id,
-            total_cents=10,
-            status="paid",
-            session=db_session,
-    )
+# @pytest.fixture
+# def db_order(db_session, db_customer, db_user):
+#     return create_order_service(
+#             customer_id=db_customer.id,
+#             owner_id=db_user.id,
+#             total_cents=10,
+#             status="paid",
+#             session=db_session,
+#     )
 
-@pytest.fixture
-def make_db_order(db_session, db_customer, db_user):
-    def _make_db_order(
-        total_cents: int,
-        status: Literal['paid', 'pending'],
-    ):
-        return create_order_service(
-                customer_id=db_customer.id,
-                owner_id=db_user.id,
-                total_cents=total_cents,
-                status=status,
-                session=db_session,
-        )
+# @pytest.fixture
+# def make_db_order(db_session, db_customer, db_user):
+#     def _make_db_order(
+#         total_cents: int,
+#         status: Literal['paid', 'pending'],
+#     ):
+#         return create_order_service(
+#                 customer_id=db_customer.id,
+#                 owner_id=db_user.id,
+#                 total_cents=total_cents,
+#                 status=status,
+#                 session=db_session,
+#         )
 
-    return _make_db_order
-
-
-@pytest.fixture
-def make_db_order_for_query(db_session, db_customer, db_user):
-    def _make_db_order(
-        total_cents: int,
-        status: Literal['paid', 'pending'],
-        archived_at: datetime | None = None,
-    ):
-        db_order= Order(
-            created_at=datetime.now(UTC),
-            customer_id=db_customer.id,
-            owner_id=db_user.id,
-            total_cents=total_cents,
-            status=status,
-            archived_at=archived_at
-        )
-
-        db_session.add(db_order)
-        db_session.commit()
-        db_session.refresh(db_order)
-
-        return db_order
-
-    return _make_db_order
+#     return _make_db_order
 
 
+# @pytest.fixture
+# def make_db_order_for_query(db_session, db_customer, db_user):
+#     def _make_db_order(
+#         total_cents: int,
+#         status: Literal['paid', 'pending'],
+#         archived_at: datetime | None = None,
+#     ):
+#         db_order= Order(
+#             created_at=datetime.now(UTC),
+#             customer_id=db_customer.id,
+#             owner_id=db_user.id,
+#             total_cents=total_cents,
+#             status=status,
+#             archived_at=archived_at
+#         )
 
-@pytest.fixture
-def db_item(db_session, db_order):
-    return create_item_service(
-            order_id=db_order.id,
-            product_name="toy",
-            quantity=10,
-            unit_price_cents=50,
-        session=db_session,
-    )
+#         db_session.add(db_order)
+#         db_session.commit()
+#         db_session.refresh(db_order)
 
-@pytest.fixture
-def make_db_item(db_session, db_order):
-    def _make_db_item(
-            product_name:str,
-            quantity: int,
-            unit_price_cents: int
-    ):
-        return create_item_service(
-                order_id=db_order.id,
-                product_name=product_name,
-                quantity=quantity,
-                unit_price_cents=unit_price_cents,
-                session=db_session
-        )
+#         return db_order
 
-    return _make_db_item
+#     return _make_db_order
 
 
-@pytest.fixture
-def make_db_item_for_order(db_session, db_order):
-    def _make_db_item(
-            *,
-            order_id: int,
-            product_name:str,
-            quantity: int,
-            unit_price_cents: int
-    ):
-        return create_item_service(
-                order_id=order_id,
-                product_name=product_name,
-                quantity=quantity,
-                unit_price_cents=unit_price_cents,
-                session=db_session
-        )
 
-    return _make_db_item
+# @pytest.fixture
+# def db_item(db_session, db_order):
+#     return create_item_service(
+#             order_id=db_order.id,
+#             product_name="toy",
+#             quantity=10,
+#             unit_price_cents=50,
+#         session=db_session,
+#     )
+
+# @pytest.fixture
+# def make_db_item(db_session, db_order):
+#     def _make_db_item(
+#             product_name:str,
+#             quantity: int,
+#             unit_price_cents: int
+#     ):
+#         return create_item_service(
+#                 order_id=db_order.id,
+#                 product_name=product_name,
+#                 quantity=quantity,
+#                 unit_price_cents=unit_price_cents,
+#                 session=db_session
+#         )
+
+#     return _make_db_item
 
 
-@pytest.fixture
-def make_item_input():
-    def _make_item_input(
-            product_name:str,
-            quantity: int,
-            unit_price_cents: int
-    ) -> ItemForOrderWithItemsCreate:
-        return ItemForOrderWithItemsCreate(
-                product_name=product_name,
-                quantity=quantity,
-                unit_price_cents=unit_price_cents,
-        )
+# @pytest.fixture
+# def make_db_item_for_order(db_session, db_order):
+#     def _make_db_item(
+#             *,
+#             order_id: int,
+#             product_name:str,
+#             quantity: int,
+#             unit_price_cents: int
+#     ):
+#         return create_item_service(
+#                 order_id=order_id,
+#                 product_name=product_name,
+#                 quantity=quantity,
+#                 unit_price_cents=unit_price_cents,
+#                 session=db_session
+#         )
 
-    return _make_item_input
+#     return _make_db_item
+
+
+# @pytest.fixture
+# def make_item_input():
+#     def _make_item_input(
+#             product_name:str,
+#             quantity: int,
+#             unit_price_cents: int
+#     ) -> ItemForOrderWithItemsCreate:
+#         return ItemForOrderWithItemsCreate(
+#                 product_name=product_name,
+#                 quantity=quantity,
+#                 unit_price_cents=unit_price_cents,
+#         )
+
+#     return _make_item_input
 
 

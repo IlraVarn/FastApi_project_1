@@ -20,6 +20,16 @@ bearer_scheme = HTTPBearer()
 
 # TEMPORARY / DEV-ONLY
 # verifies the DEV bearer token and returns the hardcoded DEV identity
+
+#  first produces HTTPAuthorizationCredentials(
+#     scheme="Bearer",
+#     credentials="abc123")
+
+# then returns AuthContext(
+#     user_id=1,
+# )
+
+
 def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: Session = Depends(get_session)

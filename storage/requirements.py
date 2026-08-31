@@ -11,7 +11,8 @@ def add_gate_requirement_record(
         gate_id: int,
         requirement_type: str,
         session: Session
-        ) -> GateRequirement:
+    ) -> GateRequirement:
+
     db_requirement = GateRequirement(
         gate_id=gate_id,
         requirement_type=requirement_type,
@@ -26,7 +27,6 @@ def list_requirements_by_gate_id(
         gate_id: int,
         session: Session
     )-> list[GateRequirement]:
-    
 
     statement = (
         select(GateRequirement)

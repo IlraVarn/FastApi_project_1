@@ -10,6 +10,8 @@ from services.users import create_user_service
 from sqlmodel import SQLModel
 from errors import DataIntegrityError
 from typing import cast
+from auth.context import AuthContext
+from auth.dependencies import get_authenticated_user
 
 
 # TEMPORARY / DEV-ONLY
@@ -40,4 +42,12 @@ def dev_create_user(
         "user_id": db_user.id,
     }
 
+
+
+#router for test_authentication.py
+@router.get("/me")
+def read_me(
+    current_user: AuthContext = Depends(get_authenticated_user),
+) -> AuthContext:
+    return current_user
 
