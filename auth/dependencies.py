@@ -63,6 +63,7 @@ def get_authenticated_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     if db_user.id is None:

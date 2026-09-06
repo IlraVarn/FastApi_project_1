@@ -44,10 +44,3 @@ def dev_create_user(
 
 
 
-#router for test_authentication.py
-@router.get("/me")
-def read_me(
-    current_user: AuthContext = Depends(get_authenticated_user),
-) -> AuthContext:
-    return current_user
-

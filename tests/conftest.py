@@ -160,6 +160,23 @@ def make_organization(client, auth_headers):
     return _make_organization
 
 
+
+
+
+"""conftest client
+        ↓
+     main.app
+        ├── test DB override
+        │
+        └── auth_test_router
+                ↓
+          /auth_test/auth
+                ↓
+       get_authenticated_user()"""
+
+
+
+
 # #ITEMS
 # @pytest.fixture
 # def item(client, order):
@@ -342,5 +359,6 @@ def make_organization(client, auth_headers):
 #         )
 
 #     return _make_item_input
+
 
 
