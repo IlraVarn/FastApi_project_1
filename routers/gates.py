@@ -58,16 +58,17 @@ from mappers import (
     )
 
 
-router = APIRouter(prefix="/organizations/{organization_id}/gates", 
-                   tags=["gates"])
-
-#users TenantContext which checks whether authenticated user is allowed 
+#uses TenantContext which checks whether authenticated user is allowed 
 # to act inside this organization
 #TenantContext depends on the get_authenticated_user
 # TenantContext(
 #     user_id=1,
 #     organization_id=7,
 # )
+
+
+router = APIRouter(prefix="/organizations/{organization_id}/gates", 
+                   tags=["gates"])
 
 
 @router.post(

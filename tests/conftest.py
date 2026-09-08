@@ -1,32 +1,15 @@
-import pytest
 import os
+import pytest
 
-from auth.context import AuthContext
-from auth.dependencies import get_authenticated_user
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
-from datetime import UTC, datetime
 
-import models  # keeps SQLModel metadata aware of tables
+import models
+from auth.context import AuthContext
+from auth.dependencies import get_authenticated_user
 from db import get_session
 from main import app
 
-# from services.customers import create_customer_service
-# from services.gates import create_order_service
-# from services.requirements import create_item_service
-from models import (
-    User,
-    Membership,
-    Organization,
-    Gate,
-    GateType,
-    GateRequirement,
-    GateEvidence,
-    )
-
-from typing import Literal
-
-os.environ["DEV_AUTH_TOKEN"] = "test-token"
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -38,25 +21,21 @@ if not TEST_DATABASE_URL.endswith("/fastapi_learning_test"):
         "Tests must run against fastapi_learning_test"
     )
 
+
 test_engine = create_engine(TEST_DATABASE_URL)
+
 
 def override_get_session():
     with Session(test_engine) as session:
         yield session
 
-@pytest.fixture
-def auth_headers():
-    return {
-        "Authorization": "Bearer test-token"
-    } 
 
 @pytest.fixture(autouse=True)
 def reset_test_database():
     SQLModel.metadata.drop_all(test_engine)
     SQLModel.metadata.create_all(test_engine)
-    #added line
-    app.dependency_overrides.clear()
 
+    app.dependency_overrides.clear()
     app.dependency_overrides[get_session] = override_get_session
 
     yield
@@ -74,16 +53,13 @@ def db_session():
     with Session(test_engine) as session:
         yield session
 
-#endpoint test fixtures
-
-
 
 
 #USERS
 @pytest.fixture
 def user(client):
     response = client.post(
-        "/users",
+        "/dev_onboarding/users",
         json={
             "name": "Olga",
             "email": "olga@x.com",
@@ -94,16 +70,17 @@ def user(client):
     return response.json()
 
 
-
 @pytest.fixture
 def authenticated_client(client, user):
-    def override_get_current_user() -> AuthContext:
+    user_id = user["user_id"]
+
+    def override_get_authenticated_user() -> AuthContext:
         return AuthContext(
-            user_id=user["id"],
+            user_id=user_id,
         )
 
     app.dependency_overrides[get_authenticated_user] = (
-        override_get_current_user
+        override_get_authenticated_user
     )
 
     yield client
@@ -118,7 +95,7 @@ def authenticated_client(client, user):
 def make_user(client):
     def _make_user(name: str, email: str):
         response = client.post(
-            '/users',
+            '/dev_onboarding/users',
             json={
                 "name": name,
                 "email": email,
@@ -129,29 +106,29 @@ def make_user(client):
     
     return _make_user
 
+
 #ORGANIZATIONS
 @pytest.fixture
-def organization(client, auth_headers):
-    response = client.post(
+def organization(authenticated_client):
+    response = authenticated_client.post(
         "/organizations",
         json={
             'name': 'test_organization',
-        },
-        headers=auth_headers,
+        }
     )
 
     assert response.status_code == 201
     return response.json()
 
+
 @pytest.fixture
-def make_organization(client, auth_headers):
+def make_organization(authenticated_client):
     def _make_organization(name: str):
-        response = client.post(
+        response = authenticated_client.post(
             "/organizations",
             json={
                 'name': name,
             },
-            headers=auth_headers,
         )
 
         assert response.status_code == 201

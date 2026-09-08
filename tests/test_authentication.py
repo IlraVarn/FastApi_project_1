@@ -7,13 +7,19 @@ from auth.dependencies import get_authenticated_user
 from main import app
 from models import User
 
+
+"""test_authentication.py
+    → DO NOT use authenticated_client
+    → real token/env/User lookup
+    → test get_authenticated_user()"""
+
 #container of test routes:
 auth_test_router = APIRouter()
 
 
 #Test-only route. Not included in the main.py
 @auth_test_router.get("/auth_test/auth")
-def read_me(
+def read_user(
     current_user: AuthContext = Depends(get_authenticated_user),
 ) -> AuthContext:
     return current_user

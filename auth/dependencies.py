@@ -29,6 +29,10 @@ bearer_scheme = HTTPBearer()
 #     user_id=1,
 # )
 
+#Env Variable for auth
+# export DEV_AUTH_TOKEN="abc123"
+# export DEV_AUTH_USER_ID="1"
+
 
 def get_authenticated_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
