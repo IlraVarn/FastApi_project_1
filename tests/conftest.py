@@ -4,11 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 
-import models
-from auth.context import AuthContext
-from auth.dependencies import get_authenticated_user
-from db import get_session
-from main import app
+import app.models as models
+from app.auth.context import AuthContext
+from app.auth.dependencies import get_authenticated_user
+from app.db import get_session
+from app.main import app
 
 
 TEST_DATABASE_URL = os.getenv(
