@@ -4,13 +4,16 @@ from app.models import (
                     )
 
 from sqlmodel import col
+from app.errors import DataIntegrityError
 
 
 
 
 
 def to_organization_public(db_organization: Organization) -> OrganizationPublic:
-    assert db_organization.id is not None
+
+    if db_organization.id is None:
+        raise DataIntegrityError()
     
     return OrganizationPublic(
         id= db_organization.id,

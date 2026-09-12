@@ -251,7 +251,7 @@ def patch_gate(
 
     except DataIntegrityError as error:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="internal server error",
         ) from error
 
@@ -293,7 +293,7 @@ def archive_gate(
     
     except DataIntegrityError as error:
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="internal server error",
         ) from error
 

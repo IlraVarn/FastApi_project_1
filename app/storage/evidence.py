@@ -8,13 +8,13 @@ from sqlmodel import Session, col, select
 
 
 
-
 def add_evidence_record(
     *,
     organization_id: int,
     name: str,
     session: Session,
 ) -> Evidence:
+    
     db_evidence = Evidence(
         organization_id=organization_id,
         name=name,
@@ -55,13 +55,14 @@ def add_evidence_version_record(
     return db_version
 
 
-
-def get_evidence_record_for_update(
+def get_evidence_by_id_and_organization_for_update(
     *,
     evidence_id: int,
     organization_id: int,
     session: Session,
 ) -> Evidence | None:
+    """Load tenant-scoped Evidence and lock the row for update."""
+
     statement = (
         select(Evidence)
         .where(
@@ -76,9 +77,10 @@ def get_evidence_record_for_update(
 
 def get_latest_evidence_version_record(
     *,
-    evidence_id: int,
+   evidence_id: int,
     session: Session,
 ) -> EvidenceVersion | None:
+    
     statement = (
         select(EvidenceVersion)
         .where(

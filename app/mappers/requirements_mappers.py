@@ -12,6 +12,7 @@ from app.models import (Gate,
                     )
 
 from sqlmodel import col
+from app.errors import DataIntegrityError
 
 
 def to_requirement_public_list(
@@ -29,8 +30,8 @@ def to_requirement_public_list(
 def to_requirement_public(
         db_requirement: GateRequirement
     )-> GateRequirementPublic:
-    
-    assert db_requirement.id is not None
+    if db_requirement.id is None:
+        raise DataIntegrityError()
 
     return GateRequirementPublic(
         id=db_requirement.id,

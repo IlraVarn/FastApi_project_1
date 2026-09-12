@@ -13,6 +13,7 @@ from app.models import (
 def to_evidence_public(
     db_evidence: Evidence,
 ) -> EvidencePublic:
+    
     if db_evidence.id is None:
         raise DataIntegrityError()
 
@@ -26,6 +27,7 @@ def to_evidence_public(
 def to_evidence_version_public(
     db_version: EvidenceVersion,
 ) -> EvidenceVersionPublic:
+    
     if db_version.id is None:
         raise DataIntegrityError()
 

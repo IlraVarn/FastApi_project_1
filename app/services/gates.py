@@ -54,9 +54,7 @@ def create_gate_with_requirements_service(
         session.flush()
 
         gate_id = db_gate.id
-
         if gate_id is None:
-            session.rollback()
             raise DataIntegrityError()
 
 

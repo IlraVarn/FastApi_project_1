@@ -104,6 +104,7 @@ Organization
 execution architecture:
 
 AUTH DEPENDENCY
+→ credential validation
 → AuthContext
 
 TENANCY DEPENDENCY + TENANCY SERVICE
@@ -111,22 +112,50 @@ TENANCY DEPENDENCY + TENANCY SERVICE
 → TenantContext
 
 ROUTER
-→ HTTP parsing / dependencies / error mapping
+→ HTTP path/query/body binding
+→ dependency injection
+→ domain-error → HTTP-error mapping
 
 REQUEST MODEL
-→ client-input validation
+→ client-input contract
+→ basic field/type validation
 
 SERVICE
-→ business rules / orchestration / transaction ownership
+→ business rules
+→ orchestration
+→ transaction ownership
+→ commit / rollback
+→ enforce operation invariants needed to complete the transaction
+→ enforce tenant/resource authorization for protected operations
+→ calls Provider Adapter when needed
+
+PROVIDER ADAPTER
+→ S3
+→ AI provider
+→ email/webhooks/etc.
 
 STORAGE
-→ SQL queries / persistence / DB representation conversion
+→ SQL queries
+→ tenant-scoped/resource-scoped lookups
+→ ORM loading
+→ staged DB writes
+→ DB locks / flush when required
 
 ORM MODEL
 → database representation
 
 MAPPER
-→ ORM → public response model
+→ ORM/internal result → public response model
+→ enforce public-output invariants
+   e.g. persisted entity ID must exist
+
+RESPONSE MODEL
+→ public output contract
 
 FASTAPI
-→ public model → JSON
+→ response model validation/filtering
+→ JSON serialization
+→ HTTP response
+
+
+

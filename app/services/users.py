@@ -19,7 +19,11 @@ def create_user_service(
             email=email,
             session=session,
         )
+        session.flush()
 
+        if db_user.id is None:
+            raise DataIntegrityError()
+    
         session.commit()
 
     except IntegrityError as error:
@@ -31,9 +35,6 @@ def create_user_service(
         raise
 
     session.refresh(db_user)
-
-    if db_user.id is None:
-        raise DataIntegrityError()
 
     return db_user
 

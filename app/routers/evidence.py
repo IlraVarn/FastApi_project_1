@@ -1,5 +1,3 @@
-from typing import Annotated, Literal
-from app.auth.dependencies import AuthContext, get_authenticated_user
 from app.tenancy.context import TenantContext
 from app.tenancy.dependencies import get_tenant_context
 from fastapi import (APIRouter, 
@@ -15,20 +13,16 @@ from sqlmodel import Session
 from app.db import get_session
 
 from app.models import (
-   Evidence,
-   EvidenceVersion,
    EvidenceCreatedPublic,
    EvidenceCreate,
    EvidenceVersionCreate,
    EvidenceVersionPublic,
-    
     )
 
 from app.services.evidence import (
     create_evidence_service,
     create_evidence_version_service,
     )
-
 
 from app.errors import (
     EvidenceNotFoundError, 
@@ -39,6 +33,20 @@ from app.mappers.evidence_mappers import (
     to_evidence_public,
     to_evidence_version_public,
 )
+"""
+User
+  │
+  ▼
+Membership
+  ▲
+  │
+Organization
+  │
+  ├────────► Evidence
+  │             │
+  │             └────────► EvidenceVersion ────────► EvidenceUse
+  """
+
 
 
 router = APIRouter(prefix="/organizations/{organization_id}/evidence", 
@@ -59,6 +67,7 @@ def create_evidence(
         get_session
     ),
 ) -> EvidenceCreatedPublic:
+    
     try:
         db_evidence, db_version = (
             create_evidence_service(
@@ -100,16 +109,12 @@ def create_evidence(
 )
 def create_evidence_version(
     request: EvidenceVersionCreate,
-    evidence_id: int = Path(
-        gt=0,
-    ),
-    tenant: TenantContext = Depends(
-        get_tenant_context
-    ),
-    session: Session = Depends(
-        get_session
-    ),
+    evidence_id: int = Path(gt=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_session),
+    
 ) -> EvidenceVersionPublic:
+    
     try:
         db_version = create_evidence_version_service(
             tenant=tenant,
@@ -130,7 +135,7 @@ def create_evidence_version(
 
     except DataIntegrityError as error:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Evidence version could not be created",
         ) from error
 

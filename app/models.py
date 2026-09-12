@@ -244,18 +244,13 @@ class EvidenceCreate(SQLModel):
         extra="forbid",
     )  # type: ignore[assignment]
 
-    name: str = Field(
-        min_length=1,
-    )
+    name: str = Field(min_length=1)
 
     version: EvidenceVersionCreate
 
     @field_validator("name")
     @classmethod
-    def strip_and_reject_blank(
-        cls,
-        value: str,
-    ) -> str:
+    def strip_and_reject_blank(cls, value: str) -> str:
         value = value.strip()
 
         if not value:
@@ -265,31 +260,22 @@ class EvidenceCreate(SQLModel):
 
 
 class EvidenceVersionCreate(SQLModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )  # type: ignore[assignment]
+    model_config = ConfigDict(extra="forbid",
+                              )  # type: ignore[assignment]
 
-    original_filename: str = Field(
-        min_length=1,
-    )
+    original_filename: str = Field(min_length=1)
 
-    content_type: str = Field(
-        min_length=1,
-    )
+    content_type: str = Field(min_length=1)
 
-    size_bytes: int = Field(
-        gt=0,
-    )
+    size_bytes: int = Field(gt=0,le=26_214_400)
+
 
     @field_validator(
         "original_filename",
         "content_type",
     )
     @classmethod
-    def strip_and_reject_blank(
-        cls,
-        value: str,
-    ) -> str:
+    def strip_and_reject_blank(cls, value: str) -> str:
         value = value.strip()
 
         if not value:
@@ -567,3 +553,31 @@ GATE_SORT_COLUMNS = {
 }
 
 
+
+
+#
+# class EvidenceCreatedPublic(SQLModel):
+#     evidence: EvidencePublic
+#     version: EvidenceVersionPublic
+
+#     returns
+
+#     EvidenceCreatedPublic(
+#     evidence=EvidencePublic(
+#         id=30,
+#         organization_id=10,
+#         name="Calibration Certificate",
+#     ),
+#     version=EvidenceVersionPublic(
+#         id=81,
+#         evidence_id=30,
+#         version_number=1,
+#         original_filename="certificate.pdf",
+#         content_type="application/pdf",
+#         size_bytes=230000,
+#         checksum_sha256=None,
+#         upload_status="pending",
+#         created_by_user_id=7,
+#         created_at=...,
+#     ),
+# )
