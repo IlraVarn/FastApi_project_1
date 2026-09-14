@@ -1,16 +1,22 @@
-from app.models import (Gate, 
-                    GateStatus,
-                    GateType,
-                    GatePublic,
-                    GateWithRequirementsPublic,
-                    GateRequirementType,
-                    GateRequirementPublic,
-                    GateRequirement,
-                    Organization,
-                    OrganizationPublic,
-                    EvidenceUploadStatus,
-                    )
+from app.models import (
+    Gate, 
+    GateRequirement,
+    Organization,
+    )
 
+from app.schemas import (
+    GatePublic,
+    GateWithRequirementsPublic,
+    OrganizationPublic,
+    GateRequirementPublic
+)
+
+from app.enums import (
+    GateStatusType, 
+    GateRequirementType,
+    GateType,
+    EvidenceUploadStatusType
+)
 from sqlmodel import col
 from app.errors import DataIntegrityError
 

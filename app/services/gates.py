@@ -9,14 +9,12 @@ from app.errors import ( GateNotFoundError,
                     InvalidGateUpdateError,
                     GateArchiveNotAllowedError,
                     )
-from app.models import (Gate, 
-                    GateType,
-                    GateRequirement, 
-                    GateSortDirection, 
-                    GateSortBy, 
-                    GateStatus,
-                    GateRequirementType
-                    )
+from app.models import (
+    Gate, 
+    GateRequirement, 
+    )
+from app.schemas import GateSortBy, GateSortDirection
+from app.enums import GateRequirementType, GateStatusType, GateType
 from typing import Literal, Any
 from sqlalchemy import asc, desc
 from app.storage.gates import (
@@ -47,7 +45,7 @@ def create_gate_with_requirements_service(
         db_gate = add_gate_record(
             organization_id=tenant.organization_id,
             gate_type=gate_type,
-            status=GateStatus.DRAFT,
+            status=GateStatusType.DRAFT,
             session=session,
         )
 
@@ -112,7 +110,7 @@ def list_active_gates_with_count_service(
         *,
         session: Session,               
         gate_type: GateType | None,
-        status: GateStatus | None,
+        status: GateStatusType | None,
         sort_by: GateSortBy,
         sort_dir: GateSortDirection,
         offset: int,
@@ -131,14 +129,14 @@ def list_active_gates_with_count_service(
         organization_id=tenant.organization_id
        )
 
-    gate_count_with_filter = count_active_gates_by_filter(
+    db_gates_count = count_active_gates_by_filter(
             gate_type=gate_type,
             session=session,               
             status=status,
             organization_id=tenant.organization_id
            )
 
-    return db_gates, gate_count_with_filter
+    return db_gates, db_gates_count
 
 
 def update_gate_patch_service(

@@ -1,6 +1,6 @@
 
 from app.tenancy.context import TenantContext
-from app.models import Evidence, EvidenceUploadStatus
+from app.models.evidence import Evidence, EvidenceVersion
 from sqlmodel import Session
 from app.storage.gates import get_active_gate_by_id
 from app.errors import ( 
@@ -14,8 +14,9 @@ from app.storage.evidence import (
     get_latest_evidence_version_record
 )
 from sqlalchemy.exc import IntegrityError
-from app.models import EvidenceVersion, Evidence
+from app.models.evidence import EvidenceVersion, Evidence
 from uuid import uuid4
+from app.enums import EvidenceUploadStatusType
 
 
 

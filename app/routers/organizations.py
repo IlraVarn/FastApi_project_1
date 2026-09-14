@@ -18,10 +18,11 @@ from app.errors import (DataIntegrityError,
 from app.mappers.organization_mappers import (to_organization_public,)
 
 
-from app.models import (
+from app.schemas import (
      OrganizationCreate,
      OrganizationPublic
      )
+
 from app.services.organizations import create_self_service_organization_service
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 

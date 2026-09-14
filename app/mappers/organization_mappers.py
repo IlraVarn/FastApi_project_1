@@ -1,8 +1,7 @@
 from app.models import (
                     Organization,
-                    OrganizationPublic,
                     )
-
+from app.schemas import OrganizationPublic
 from sqlmodel import col
 from app.errors import DataIntegrityError
 

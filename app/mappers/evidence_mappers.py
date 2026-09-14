@@ -4,11 +4,13 @@ from app.errors import DataIntegrityError
 from app.models import (
     Evidence,
     EvidenceVersion,
+)
+from app.schemas import (
     EvidencePublic,
     EvidenceVersionPublic,
-    EvidenceCreatedPublic,
-    EvidenceUploadStatus
-    )
+    EvidenceCreatedPublic
+)
+from app.enums import EvidenceUploadStatusType
 
 def to_evidence_public(
     db_evidence: Evidence,
@@ -38,8 +40,7 @@ def to_evidence_version_public(
         original_filename=db_version.original_filename,
         content_type=db_version.content_type,
         size_bytes=db_version.size_bytes,
-        checksum_sha256=db_version.checksum_sha256,
-        upload_status=EvidenceUploadStatus(db_version.upload_status),
+        upload_status=EvidenceUploadStatusType(db_version.upload_status),
         created_by_user_id=db_version.created_by_user_id,
         created_at=db_version.created_at,
     )

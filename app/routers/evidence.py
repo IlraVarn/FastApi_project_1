@@ -12,7 +12,7 @@ from sqlmodel import Session
 
 from app.db import get_session
 
-from app.models import (
+from app.schemas import (
    EvidenceCreatedPublic,
    EvidenceCreate,
    EvidenceVersionCreate,

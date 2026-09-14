@@ -14,19 +14,19 @@ from sqlmodel import Session
 
 from app.db import get_session
 
-from app.models import (
+from app.schemas import (
     GatePublic,
-    GateStatus,
-    GateType,
     GateStateTransitionRequest,
     GateCreateRequest,
-    GatePatchRequest,
-    GateWithRequirementsPublic,
-    GateListPublicWithCount,
-    GateSortDirection,
     GateSortBy,
-    
-    )
+    GateSortDirection,
+    GateWithRequirementsPublic,
+    GatePatchRequest,
+    GateListPublicWithCount
+
+)
+
+from app.enums import GateStatusType, GateType
 
 from app.services.gates import (
     create_gate_with_requirements_service,
@@ -55,7 +55,7 @@ from app.errors import (
 from app.mappers.gate_mappers import (
     to_gate_with_requirements_public,
     to_gate_public,
-    to_gate_public_list,
+    to_gate_list_public_with_count
     )
 
 
@@ -99,9 +99,8 @@ def create_gate(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Gate could not be created") from error
 
-    public_gate = to_gate_with_requirements_public(db_gate, db_requirements)
+    return to_gate_with_requirements_public(db_gate, db_requirements)
 
-    return public_gate
 
 
 @router.post(
@@ -183,7 +182,7 @@ def get_gate_with_requirements(
             response_model=GateListPublicWithCount)
 def list_gates_with_count(
     gate_type: GateType | None = None,
-    status: GateStatus | None = None,
+    status: GateStatusType | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     session: Session = Depends(get_session),
@@ -204,11 +203,10 @@ def list_gates_with_count(
         tenant=tenant
     )
 
-    public_gates = to_gate_public_list(db_gates)
-
-    return GateListPublicWithCount(
-        data=public_gates,
+    return to_gate_list_public_with_count(
+        db_gates=db_gates,
         count=db_gates_count)
+
 
 
 #UPDATE    

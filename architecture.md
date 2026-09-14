@@ -145,7 +145,7 @@ ORM MODEL
 → database representation
 
 MAPPER
-→ ORM/internal result → public response model
+→ ORM/internal result → construct complete Public model
 → enforce public-output invariants
    e.g. persisted entity ID must exist
 

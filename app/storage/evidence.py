@@ -1,9 +1,10 @@
 
-from app.models import (EvidenceUploadStatus, 
+from app.models import ( 
                     Evidence,
                     EvidenceVersion,
                     )
 
+from app.enums import EvidenceUploadStatusType
 from sqlmodel import Session, col, select
 
 
@@ -45,7 +46,7 @@ def add_evidence_version_record(
         size_bytes=size_bytes,
         checksum_sha256=None,
         upload_status=(
-            EvidenceUploadStatus.PENDING.value
+            EvidenceUploadStatusType.PENDING.value
         ),
         created_by_user_id=created_by_user_id,
     )

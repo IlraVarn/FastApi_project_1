@@ -9,7 +9,8 @@ from app.errors import (
     GateNotFoundError,
     RejectionReasonRequiredError
 )
-from app.models import Gate, GateStatus
+from app.models import Gate
+from app.enums import GateStatusType
 from app.storage.gate_transitions import add_gate_state_transition_record
 from app.storage.gates import (
     get_active_gate_by_id,
@@ -18,17 +19,17 @@ from app.storage.gates import (
 from app.tenancy.context import TenantContext
 
 
-ALLOWED_GATE_TRANSITIONS: dict[GateStatus, set[GateStatus]] = {
-    GateStatus.DRAFT: {
-        GateStatus.SUBMITTED,
+ALLOWED_GATE_TRANSITIONS: dict[GateStatusType, set[GateStatusType]] = {
+    GateStatusType.DRAFT: {
+        GateStatusType.SUBMITTED,
     },
-    GateStatus.SUBMITTED: {
-        GateStatus.APPROVED,
-        GateStatus.REJECTED,
+    GateStatusType.SUBMITTED: {
+        GateStatusType.APPROVED,
+        GateStatusType.REJECTED,
     },
-    GateStatus.APPROVED: set(),
-    GateStatus.REJECTED: {
-        GateStatus.DRAFT,
+    GateStatusType.APPROVED: set(),
+    GateStatusType.REJECTED: {
+        GateStatusType.DRAFT,
     },
 }
 
@@ -37,7 +38,7 @@ def transition_gate_state_service(
     *,
     tenant: TenantContext,
     gate_id: int,
-    new_status: GateStatus,
+    new_status: GateStatusType,
     reason: str | None,
     session: Session,
 ) -> Gate:
@@ -51,7 +52,7 @@ def transition_gate_state_service(
         raise GateNotFoundError()
 
     try:
-        current_status = GateStatus(db_gate.status)
+        current_status = GateStatusType(db_gate.status)
 
     except ValueError as error:
         raise DataIntegrityError() from error
@@ -64,7 +65,7 @@ def transition_gate_state_service(
     changed_at = datetime.now(UTC)
 
     if (
-        new_status == GateStatus.REJECTED
+        new_status == GateStatusType.REJECTED
         and reason is None
     ):
         raise RejectionReasonRequiredError()

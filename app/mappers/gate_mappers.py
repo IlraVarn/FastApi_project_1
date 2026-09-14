@@ -1,15 +1,24 @@
-from app.models import (Gate, 
-                    GateStatus,
-                    GateType,
-                    GatePublic,
-                    GateWithRequirementsPublic,
-                    GateRequirementType,
-                    GateRequirementPublic,
-                    GateRequirement,
-                    Organization,
-                    OrganizationPublic,
-                    EvidenceUploadStatus,
-                    )
+
+
+from app.models import (
+    Gate, 
+    GateRequirement,
+    Organization,
+    )
+
+from app.schemas import (
+    GatePublic,
+    GateWithRequirementsPublic,
+    OrganizationPublic,
+    GateRequirementPublic,
+    GateListPublicWithCount
+)
+
+from app.enums import (
+    GateStatusType, 
+    GateRequirementType,
+    GateType,
+    EvidenceUploadStatusType)
 
 from sqlmodel import col
 from app.mappers.requirements_mappers import to_requirement_public
@@ -25,7 +34,7 @@ def to_gate_public(db_gate: Gate)-> GatePublic:
         id=db_gate.id,
         organization_id=db_gate.organization_id,
         gate_type=GateType(db_gate.gate_type),
-        status=GateStatus(db_gate.status),
+        status=GateStatusType(db_gate.status),
         created_at=db_gate.created_at,
         updated_at=db_gate.updated_at,
         archived_at=db_gate.archived_at,
@@ -63,7 +72,7 @@ def to_gate_with_requirements_public(
         id=db_gate.id,
         organization_id=db_gate.organization_id,
         gate_type=GateType(db_gate.gate_type),
-        status=GateStatus(db_gate.status),
+        status=GateStatusType(db_gate.status),
         created_at=db_gate.created_at,
         updated_at=db_gate.updated_at,
         archived_at=db_gate.archived_at,
@@ -73,4 +82,18 @@ def to_gate_with_requirements_public(
 
 
 
+def to_gate_list_public_with_count(
+    db_gates: list[Gate],
+    count: int,
+) -> GateListPublicWithCount:
 
+    public_gates: list[GatePublic] = []
+
+    for db_gate in db_gates:
+        public_gate = to_gate_public(db_gate)
+        public_gates.append(public_gate)
+
+    return GateListPublicWithCount(
+        data=public_gates,
+        count=count,
+    )

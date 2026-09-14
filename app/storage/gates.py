@@ -1,23 +1,30 @@
 from sqlmodel import Session, select, col
 from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
-from app.models import (Gate, 
-                    GateStateTransition,  
-                    GateStatus, 
-                    GateSortBy, 
-                    GateSortDirection,
-                    GateType,
-                    GATE_SORT_COLUMNS,
-                    )
+from app.models import (
+    Gate, 
+    GateStateTransition
+    )
+
+from app.enums import GateStatusType, GateType
+from app.schemas import GateSortBy, GateSortDirection
 
 from typing import Any
+
+GATE_SORT_COLUMNS = {
+    "created_at": Gate.created_at,
+    "status": Gate.status,
+    "id": Gate.id,
+}
+
+
 
 
 def add_gate_record(
     *,
     organization_id: int,
     gate_type: GateType,
-    status: GateStatus,
+    status: GateStatusType,
     session: Session,
 ) -> Gate:
     """Create and stage a new Gate for persistence.
@@ -95,7 +102,7 @@ def list_active_gates(
         *,
         session: Session,    
         gate_type: GateType | None,          
-        status: GateStatus | None,
+        status: GateStatusType | None,
         sort_by: GateSortBy,
         sort_dir: GateSortDirection,
         offset: int,
@@ -145,7 +152,7 @@ def count_active_gates_by_filter(
         *,
         session: Session,    
         gate_type: GateType | None,          
-        status: GateStatus | None,
+        status: GateStatusType | None,
         organization_id: int
 ) -> int:
     """Return the number of active gates by filter."""
