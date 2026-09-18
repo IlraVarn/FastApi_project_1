@@ -20,6 +20,10 @@ class EvidenceVersionCreate(SQLModel):
 
     size_bytes: int = Field(gt=0,le=26_214_400)
 
+    checksum_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+    )
 
     @field_validator(
         "original_filename",
@@ -31,6 +35,26 @@ class EvidenceVersionCreate(SQLModel):
 
         if not value:
             raise ValueError("must not be blank")
+
+        return value
+
+    @field_validator("checksum_sha256")
+    @classmethod
+    def validate_checksum_sha256(cls, value: str) -> str:
+        value = value.strip().lower()
+
+        if len(value) != 64:
+            raise ValueError(
+                "checksum_sha256 must contain 64 hexadecimal characters"
+            )
+
+        if any(
+            character not in "0123456789abcdef"
+            for character in value
+        ):
+            raise ValueError(
+                "checksum_sha256 must contain only hexadecimal characters"
+            )
 
         return value
 
@@ -79,6 +103,12 @@ class EvidenceCreatedPublic(SQLModel):
 
 
 
+class EvidenceUploadUrlPublic(SQLModel):
+    method: Literal["PUT"]
+    upload_url: str
+    headers: dict[str, str]
+    expires_in_seconds: int
+
 
 #     example:
 # evidence_response = 
@@ -101,3 +131,8 @@ class EvidenceCreatedPublic(SQLModel):
     #         created_at=...,
     #     ),
 # )
+
+
+
+
+    

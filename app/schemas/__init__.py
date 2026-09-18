@@ -21,6 +21,8 @@ from app.schemas.evidence import (
     EvidencePublic,
     EvidenceVersionPublic,
     EvidenceCreatedPublic,
+    EvidenceUploadUrlPublic,
+    EvidenceUploadStatusType
 )
 # from app.schemas.evidence_use import (
 #     EvidenceUseCreate,

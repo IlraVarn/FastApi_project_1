@@ -5,6 +5,7 @@ from datetime import datetime, UTC
 from typing import Literal, ClassVar
 from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
 from enum import Enum
+from app.enums import EvidenceUploadStatusType
 
 class Evidence(SQLModel, table = True):
     __tablename__: ClassVar[str] = "evidence"
@@ -41,7 +42,7 @@ class EvidenceVersion(SQLModel, table=True):
             name="ck_evidence_versions_size_positive",
         ),
         CheckConstraint(
-            "upload_status IN ('pending', 'complete', 'failed')",
+            "upload_status IN ('pending', 'available')",
             name="ck_evidence_versions_upload_status_valid",
         ),
         CheckConstraint(
@@ -60,8 +61,29 @@ class EvidenceVersion(SQLModel, table=True):
             "storage_key",
             name="uq_evidence_versions_storage_key",
         ),
-
-    )
+        CheckConstraint(
+            "length(trim(storage_key)) > 0",
+            name="ck_evidence_versions_storage_key_non_empty",
+        ),
+        CheckConstraint(
+            "length(checksum_sha256) = 64",
+            name="ck_evidence_versions_checksum_sha256_length",
+        ),
+        CheckConstraint(
+            """
+            (
+                upload_status = 'available'
+                AND available_at IS NOT NULL
+            )
+            OR
+            (
+                upload_status = 'pending'
+                AND available_at IS NULL
+            )
+            """,
+            name="ck_evidence_versions_available_state_valid",
+        ),
+        )
 
     id: int | None = Field(
         default=None,
@@ -83,16 +105,14 @@ class EvidenceVersion(SQLModel, table=True):
 
     size_bytes: int = Field(nullable=False)
 
-    checksum_sha256: str | None = Field(
-        default=None,
-        nullable=True,
-    )
-
-    upload_status: str = Field(
-        default="pending",
+    checksum_sha256: str = Field(
         nullable=False,
     )
 
+    upload_status: str = Field(
+        default=EvidenceUploadStatusType.PENDING.value,
+        nullable=False,
+    )
     created_by_user_id: int = Field(
         foreign_key="users.id",
         nullable=False,
@@ -106,3 +126,13 @@ class EvidenceVersion(SQLModel, table=True):
         ),
     )
 
+    available_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=True,
+        ),
+    )
+
+
+    

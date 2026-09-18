@@ -1,5 +1,6 @@
 
 from app.errors import DataIntegrityError
+from app.infrastructure.s3 import PresignedUpload
 
 from app.models import (
     Evidence,
@@ -8,7 +9,8 @@ from app.models import (
 from app.schemas import (
     EvidencePublic,
     EvidenceVersionPublic,
-    EvidenceCreatedPublic
+    EvidenceCreatedPublic,
+    EvidenceUploadUrlPublic
 )
 from app.enums import EvidenceUploadStatusType
 
@@ -50,6 +52,7 @@ def to_evidence_created_public(
     db_evidence: Evidence,
     db_version: EvidenceVersion,
 ) -> EvidenceCreatedPublic:
+    
     return EvidenceCreatedPublic(
         evidence=to_evidence_public(
             db_evidence
@@ -58,3 +61,21 @@ def to_evidence_created_public(
             db_version
         ),
     )
+
+
+
+def to_evidence_upload_url_public(
+    upload: PresignedUpload,
+) -> EvidenceUploadUrlPublic:
+
+    return EvidenceUploadUrlPublic(
+        method="PUT",
+        upload_url=upload.url,
+        headers=upload.headers,
+        expires_in_seconds=(
+            upload.expires_in_seconds
+        ),
+    )
+
+
+

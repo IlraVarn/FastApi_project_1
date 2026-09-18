@@ -10,9 +10,7 @@ from enum import Enum
 
 class EvidenceUploadStatusType(str, Enum):
     PENDING = "pending"
-    COMPLETE = "complete"
-    FAILED = "failed"
-
+    AVAILABLE = "available"
 
 
 class GateStatusType(str, Enum):

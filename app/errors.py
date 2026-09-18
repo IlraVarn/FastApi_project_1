@@ -49,3 +49,27 @@ class GateArchiveNotAllowedError(AppError):
 class EvidenceNotFoundError(AppError):
     default_detail = "evidence not found"
 
+class IdempotencyConflictError(Exception):
+    pass
+
+
+class EvidenceVersionNotFoundError(Exception):
+    pass
+
+
+class EvidenceVersionNotPendingError(Exception):
+    pass
+
+
+class EvidenceUploadNotReadyError(Exception):
+    pass
+
+
+class EvidenceUploadVerificationError(Exception):
+    pass
+
+
+class EvidenceStorageError(Exception):
+    pass
+
+

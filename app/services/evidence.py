@@ -1,24 +1,64 @@
 
 from app.tenancy.context import TenantContext
 from app.models.evidence import Evidence, EvidenceVersion
+from app.models import IdempotencyRecord
 from sqlmodel import Session
 from app.storage.gates import get_active_gate_by_id
 from app.errors import ( 
     DataIntegrityError,
     EvidenceNotFoundError,
+    IdempotencyConflictError,
+    EvidenceStorageError,
+    EvidenceUploadNotReadyError,
+    EvidenceUploadVerificationError,
+    EvidenceVersionNotFoundError,
+    EvidenceVersionNotPendingError,
 )
 from app.storage.evidence import (
-    add_evidence_record, 
+    add_evidence_record,
     add_evidence_version_record,
     get_evidence_by_id_and_organization_for_update,
-    get_latest_evidence_version_record
+    get_latest_evidence_version_record,
+    get_evidence_version_by_id_evidence_and_organization,
+    get_evidence_version_by_id_evidence_and_organization_for_update,
+    mark_evidence_version_available_record,
+    get_evidence_version_by_id_and_evidence
 )
+
+from app.infrastructure.s3 import (
+    PresignedUpload,
+    S3ObjectNotFoundError,
+    S3ObjectStore,
+    S3ObjectStoreError,
+)
+from app.services.idempotency import (
+    build_idempotency_request_hash,
+    resolve_idempotency_attempt
+    )
+
+from app.storage.idempotency import (
+    try_claim_idempotency_record,
+    get_idempotency_record,
+    complete_idempotency_record,
+)
+
 from sqlalchemy.exc import IntegrityError
 from app.models.evidence import EvidenceVersion, Evidence
 from uuid import uuid4
 from app.enums import EvidenceUploadStatusType
+from datetime import datetime, UTC
 
 
+
+CREATE_EVIDENCE_OPERATION = (
+    "evidence.create"
+)
+
+CREATE_EVIDENCE_VERSION_OPERATION = (
+    "evidence.version.create"
+)
+
+EVIDENCE_UPLOAD_URL_TTL_SECONDS = 900
 
 def build_evidence_version_storage_key(
     *,
@@ -41,6 +81,7 @@ def create_evidence_service(
     original_filename: str,
     content_type: str,
     size_bytes: int,
+    checksum_sha256: str,
     session: Session,
 ) -> tuple[Evidence, EvidenceVersion]:
 
@@ -77,6 +118,7 @@ def create_evidence_service(
             original_filename=original_filename,
             content_type=content_type,
             size_bytes=size_bytes,
+            checksum_sha256=checksum_sha256,
             created_by_user_id=tenant.user_id,
             session=session,
         )
@@ -104,48 +146,56 @@ def create_evidence_version_service(
     original_filename: str,
     content_type: str,
     size_bytes: int,
+    checksum_sha256: str,
+    idempotency_key: str,
     session: Session,
 ) -> EvidenceVersion:
+    
+    request_hash = build_idempotency_request_hash(
+        values={
+            "user_id": tenant.user_id,
+            "evidence_id": evidence_id,
+            "original_filename": original_filename,
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "checksum_sha256": checksum_sha256,
+        },
+    )
+
     try:
+        (
+            idempotency_record_id,
+            existing_record,
+        ) = resolve_idempotency_attempt(
+            organization_id=tenant.organization_id,
+            operation=CREATE_EVIDENCE_VERSION_OPERATION,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            session=session,
+        )
 
-        db_evidence = get_evidence_by_id_and_organization_for_update(
+        # REPLAY
+        if existing_record is not None:
+            return _replay_evidence_version_create(
+                tenant=tenant,
+                idempotency_record=existing_record,
+                session=session,
+            )
+
+        # NEW
+        if idempotency_record_id is None:
+            raise DataIntegrityError()
+
+        db_version = _create_new_evidence_version(
+            tenant=tenant,
             evidence_id=evidence_id,
-            organization_id=tenant.organization_id,
-            session=session,
-        )
-
-        if db_evidence is None:
-            raise EvidenceNotFoundError()
-        
-        if db_evidence.id is None:
-            raise DataIntegrityError()
-
-        verified_evidence_id = db_evidence.id
-
-        latest_version = get_latest_evidence_version_record(
-            evidence_id=verified_evidence_id,
-            session=session,
-        )
-
-        if latest_version is None:
-            raise DataIntegrityError()
-
-        version_number = latest_version.version_number + 1
-
-        storage_key = build_evidence_version_storage_key(
-            organization_id=tenant.organization_id,
-            evidence_id=verified_evidence_id,
-            version_number=version_number,
-        )
-
-        db_version = add_evidence_version_record(
-            evidence_id=verified_evidence_id,
-            version_number=version_number,
-            storage_key=storage_key,
             original_filename=original_filename,
             content_type=content_type,
             size_bytes=size_bytes,
-            created_by_user_id=tenant.user_id,
+            checksum_sha256=checksum_sha256,
+            idempotency_record_id=(
+                idempotency_record_id
+            ),
             session=session,
         )
 
@@ -162,5 +212,349 @@ def create_evidence_version_service(
     session.refresh(db_version)
 
     return db_version
+
+
+def _replay_evidence_version_create(
+    *,
+    tenant: TenantContext,
+    idempotency_record: IdempotencyRecord,
+    session: Session,
+) -> EvidenceVersion:
+
+    if idempotency_record.evidence_id is None:
+        raise DataIntegrityError()
+
+    if idempotency_record.evidence_version_id is None:
+        raise DataIntegrityError()
+
+    db_version = (
+        get_evidence_version_by_id_evidence_and_organization(
+            evidence_version_id=(
+                idempotency_record.evidence_version_id
+            ),
+            evidence_id=(
+                idempotency_record.evidence_id
+            ),
+            organization_id=(
+                tenant.organization_id
+            ),
+            session=session,
+        )
+    )
+
+    if db_version is None:
+        raise DataIntegrityError()
+
+    return db_version
+
+
+def _create_new_evidence_version(
+    *,
+    tenant: TenantContext,
+    evidence_id: int,
+    original_filename: str,
+    content_type: str,
+    size_bytes: int,
+    checksum_sha256: str,
+    idempotency_record_id: int,
+    session: Session,
+) -> EvidenceVersion:
+
+    db_evidence = (
+        get_evidence_by_id_and_organization_for_update(
+            evidence_id=evidence_id,
+            organization_id=tenant.organization_id,
+            session=session,
+        )
+    )
+
+    if db_evidence is None:
+        raise EvidenceNotFoundError()
+
+    if db_evidence.id is None:
+        raise DataIntegrityError()
+
+    verified_evidence_id = db_evidence.id
+
+    latest_version = (
+        get_latest_evidence_version_record(
+            evidence_id=verified_evidence_id,
+            session=session,
+        )
+    )
+
+    if latest_version is None:
+        raise DataIntegrityError()
+
+    version_number = (
+        latest_version.version_number + 1
+    )
+
+    storage_key = build_evidence_version_storage_key(
+        organization_id=tenant.organization_id,
+        evidence_id=verified_evidence_id,
+        version_number=version_number,
+    )
+
+    db_version = add_evidence_version_record(
+        evidence_id=verified_evidence_id,
+        version_number=version_number,
+        storage_key=storage_key,
+        original_filename=original_filename,
+        content_type=content_type,
+        size_bytes=size_bytes,
+        checksum_sha256=checksum_sha256,
+        created_by_user_id=tenant.user_id,
+        session=session,
+    )
+
+    session.flush()
+
+    if db_version.id is None:
+        raise DataIntegrityError()
+
+    result_was_set = (
+        complete_idempotency_record(
+            idempotency_record_id=(
+                idempotency_record_id
+            ),
+            evidence_id=verified_evidence_id,
+            evidence_version_id=db_version.id,
+            session=session,
+        )
+    )
+
+    if not result_was_set:
+        raise DataIntegrityError()
+
+    return db_version
+
+
+def create_evidence_version_upload_url_service(
+    *,
+    tenant: TenantContext,
+    evidence_id: int,
+    evidence_version_id: int,
+    object_store: S3ObjectStore,
+    session: Session,
+) -> PresignedUpload:
+
+    db_version = (
+        get_evidence_version_by_id_evidence_and_organization(
+            evidence_version_id=(
+                evidence_version_id
+            ),
+            evidence_id=evidence_id,
+            organization_id=(
+                tenant.organization_id
+            ),
+            session=session,
+        )
+    )
+
+    if db_version is None:
+        raise EvidenceVersionNotFoundError()
+
+    if (
+        db_version.upload_status
+        != EvidenceUploadStatusType.PENDING.value
+    ):
+        raise EvidenceVersionNotPendingError()
+
+    checksum_sha256 = db_version.checksum_sha256
+
+    if checksum_sha256 is None:
+        raise DataIntegrityError()
+
+    try:
+        return object_store.create_presigned_upload(
+            storage_key=db_version.storage_key,
+            content_type=db_version.content_type,
+            checksum_sha256=checksum_sha256,
+            expires_in_seconds=(
+                EVIDENCE_UPLOAD_URL_TTL_SECONDS
+            ),
+        )
+
+    except ValueError as error:
+        raise DataIntegrityError() from error
+
+    except S3ObjectStoreError as error:
+        raise EvidenceStorageError() from error
+
+
+def complete_evidence_version_upload_service(
+    *,
+    tenant: TenantContext,
+    evidence_id: int,
+    evidence_version_id: int,
+    object_store: S3ObjectStore,
+    session: Session,
+) -> EvidenceVersion:
+
+    try:
+        db_version = (
+            get_evidence_version_by_id_evidence_and_organization(
+                evidence_version_id=(evidence_version_id),
+                evidence_id=evidence_id,
+                organization_id=(tenant.organization_id),
+                session=session,
+            )
+        )
+
+        if db_version is None:
+            raise EvidenceVersionNotFoundError()
+
+        if (
+            db_version.upload_status
+            == EvidenceUploadStatusType.AVAILABLE.value
+        ):
+            return db_version
+
+        if (
+            db_version.upload_status
+            != EvidenceUploadStatusType.PENDING.value
+        ):
+            raise EvidenceVersionNotPendingError()
+
+        expected_storage_key = (
+            db_version.storage_key
+        )
+
+        expected_size_bytes = (
+            db_version.size_bytes
+        )
+
+        expected_checksum_sha256 = (
+            db_version.checksum_sha256
+        )
+
+        if expected_checksum_sha256 is None:
+            raise DataIntegrityError()
+
+        # End the read transaction before
+        # waiting on the external S3 call.
+        session.rollback()
+
+        try:
+            metadata = (
+                object_store.get_object_metadata(
+                    storage_key=(
+                        expected_storage_key
+                    )
+                )
+            )
+
+        except S3ObjectNotFoundError as error:
+            raise (
+                EvidenceUploadNotReadyError()
+            ) from error
+
+        except S3ObjectStoreError as error:
+            raise EvidenceStorageError() from error
+
+        if (
+            metadata.size_bytes
+            != expected_size_bytes
+        ):
+            raise (
+                EvidenceUploadVerificationError()
+            )
+
+        actual_checksum_sha256 = (
+            metadata.checksum_sha256
+        )
+
+        if actual_checksum_sha256 is None:
+            raise (
+                EvidenceUploadVerificationError()
+            )
+
+        if (
+            actual_checksum_sha256
+            != expected_checksum_sha256
+        ):
+            raise (
+                EvidenceUploadVerificationError()
+            )
+
+        locked_version = (
+            get_evidence_version_by_id_evidence_and_organization_for_update(
+                evidence_version_id=(
+                    evidence_version_id
+                ),
+                evidence_id=evidence_id,
+                organization_id=(
+                    tenant.organization_id
+                ),
+                session=session,
+            )
+        )
+
+        if locked_version is None:
+            raise EvidenceVersionNotFoundError()
+
+        # Another request may have completed
+        # this exact version meanwhile.
+        if (
+            locked_version.upload_status
+            == EvidenceUploadStatusType.AVAILABLE.value
+        ):
+            session.commit()
+
+            return locked_version
+
+        if (
+            locked_version.upload_status
+            != EvidenceUploadStatusType.PENDING.value
+        ):
+            raise EvidenceVersionNotPendingError()
+
+        # Recheck the immutable values after
+        # obtaining the DB lock.
+        if (
+            locked_version.storage_key
+            != expected_storage_key
+        ):
+            raise DataIntegrityError()
+
+        if (
+            locked_version.size_bytes
+            != expected_size_bytes
+        ):
+            raise DataIntegrityError()
+
+        locked_checksum_sha256 = (
+            locked_version.checksum_sha256
+        )
+
+        if locked_checksum_sha256 is None:
+            raise DataIntegrityError()
+
+        if (
+            locked_checksum_sha256
+            != expected_checksum_sha256
+        ):
+            raise DataIntegrityError()
+
+        mark_evidence_version_available_record(
+            db_version=locked_version,
+            available_at=datetime.now(UTC),
+            session=session,
+        )
+
+        session.commit()
+
+    except IntegrityError as error:
+        session.rollback()
+        raise DataIntegrityError() from error
+
+    except Exception:
+        session.rollback()
+        raise
+
+    session.refresh(locked_version)
+
+    return locked_version
 
 
