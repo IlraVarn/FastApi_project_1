@@ -39,7 +39,11 @@ class EvidenceVersion(SQLModel, table=True):
         ),
         CheckConstraint(
             "size_bytes > 0",
-            name="ck_evidence_versions_size_positive",
+            name="ck_evidence_versions_size_positive"
+            ),
+        CheckConstraint(
+            "size_bytes <= 26214400",
+            name="ck_evidence_versions_size_max",
         ),
         CheckConstraint(
             "upload_status IN ('pending', 'available')",
@@ -56,19 +60,18 @@ class EvidenceVersion(SQLModel, table=True):
         UniqueConstraint( 
                 "evidence_id", "version_number", 
                 name="uq_evidence_versions_evidence_version", 
-        ),
+        ), #same Evidence cannot have the same version number twice
+        
         UniqueConstraint(
             "storage_key",
             name="uq_evidence_versions_storage_key",
-        ),
+        ), #Two EvidenceVersions cannot point to the exact same S3 object location
+
         CheckConstraint(
             "length(trim(storage_key)) > 0",
             name="ck_evidence_versions_storage_key_non_empty",
         ),
-        CheckConstraint(
-            "length(checksum_sha256) = 64",
-            name="ck_evidence_versions_checksum_sha256_length",
-        ),
+
         CheckConstraint(
             """
             (
@@ -83,6 +86,10 @@ class EvidenceVersion(SQLModel, table=True):
             """,
             name="ck_evidence_versions_available_state_valid",
         ),
+        CheckConstraint(
+            "checksum_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_evidence_versions_checksum_sha256_hex",
+        )
         )
 
     id: int | None = Field(
@@ -97,6 +104,7 @@ class EvidenceVersion(SQLModel, table=True):
 
     version_number: int = Field(nullable=False)
 
+    #proves where the file is. An object inside S3 bucket
     storage_key: str = Field(nullable=False)
 
     original_filename: str = Field(nullable=False)
@@ -105,6 +113,7 @@ class EvidenceVersion(SQLModel, table=True):
 
     size_bytes: int = Field(nullable=False)
 
+    #fingerprint of file's bytes. Proves it's the same file
     checksum_sha256: str = Field(
         nullable=False,
     )
@@ -135,4 +144,46 @@ class EvidenceVersion(SQLModel, table=True):
     )
 
 
+# Very important separation:
+# checksum
+# =
+# byte integrity
+
+# file-type validation
+# =
+# what kind of file is this?
+
+# malware scan
+# =
+# does it contain known malicious content?
+
+# business validation
+# =
+# does this evidence satisfy the requirement?
+# Do not collapse those into one concept.
+
     
+
+# Example storage key:
+
+# organizations/1/evidence/3/versions/2/e5149b846dee4dc696ded7d27b40f0f3
+
+# Example presigned URL:
+
+# https://your-bucket.s3.us-west-2.amazonaws.com/
+# organizations/1/evidence/3/versions/2/e5149b...
+# ?X-Amz-Algorithm=...
+# &X-Amz-Signature=...
+
+
+# Relationship:
+
+# storage_key
+# ↓
+# passed into create_presigned_upload()
+# ↓
+# AWS builds a temporary signed URL for that exact key
+# ↓
+# browser receives the URL
+# ↓
+# browser PUTs file bytes to that URL

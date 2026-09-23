@@ -90,6 +90,15 @@ class PresignedUpload:
     expires_in_seconds: int
 
 
+
+    """object_store
+    = S3ObjectStore object
+    = the thing that talks to AWS
+
+    metadata
+    = S3ObjectMetadata object
+    = the information returned from AWS"""
+
 @dataclass(frozen=True)
 class S3ObjectMetadata:
     size_bytes: int
@@ -133,6 +142,9 @@ class S3ObjectStore:
             )
         )
 
+    #If-None-Match: *
+# → tells S3 not to overwrite an object 
+# if that exact key somehow already exists
         try:
             url = (
                 self._client.generate_presigned_url(
@@ -291,3 +303,24 @@ def get_s3_object_store() -> S3ObjectStore:
     )
 
 
+# S3ObjectStore = the backend object that knows how to talk to S3.
+
+# get_s3_object_store()
+# ↓
+# creates S3ObjectStore
+# ↓
+# router receives it as object_store
+# ↓
+# service uses it
+# ↓
+# S3
+
+# It mainly does two jobs:
+
+# create_presigned_upload()
+# = get temporary upload URL
+
+# get_object_metadata()
+# = ask S3 what file actually arrived
+
+# The checksum helper methods just convert checksum format for AWS.

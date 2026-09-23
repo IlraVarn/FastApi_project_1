@@ -28,6 +28,7 @@ def try_claim_idempotency_record(
             operation=operation,
             idempotency_key=idempotency_key,
             request_hash=request_hash,
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(
             constraint="uq_idempotency_org_operation_key",
@@ -75,8 +76,6 @@ def complete_idempotency_record(
     gate_id: int | None = None,
     evidence_id: int | None = None,
     evidence_version_id: int | None = None,
-    response_status_code: int | None = None,
-    response_body: dict[str, Any] | None = None,
 ) -> bool:
 
     db_record = session.get(
@@ -92,11 +91,6 @@ def complete_idempotency_record(
     db_record.evidence_version_id = (
         evidence_version_id
     )
-
-    db_record.response_status_code = (
-        response_status_code
-    )
-    db_record.response_body = response_body
 
     session.add(db_record)
 

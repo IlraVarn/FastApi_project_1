@@ -181,8 +181,7 @@ def create_evidence_version(
 
 #generates the presigned S3 PUT URL
 @router.post(
-    "/{evidence_id}/versions/"
-    "{evidence_version_id}/upload-url",
+    "/{evidence_id}/versions/{evidence_version_id}/upload-url",
     response_model=EvidenceUploadUrlPublic,
     status_code=status.HTTP_200_OK,
 )
@@ -196,7 +195,7 @@ def create_evidence_version_upload_url(
         get_session
     ),
     object_store: S3ObjectStore = Depends(
-        get_s3_object_store
+        get_s3_object_store #talks to S3
     ),
 ) -> EvidenceUploadUrlPublic:
 
@@ -257,8 +256,7 @@ def create_evidence_version_upload_url(
 
 
 @router.post(
-    "/{evidence_id}/versions/"
-    "{evidence_version_id}/complete",
+    "/{evidence_id}/versions/{evidence_version_id}/complete",
     response_model=EvidenceVersionPublic,
     status_code=status.HTTP_200_OK,
 )
@@ -275,6 +273,7 @@ def complete_evidence_version_upload(
         get_s3_object_store
     ),
 ) -> EvidenceVersionPublic:
+    
     try:
         db_version = (
             complete_evidence_version_upload_service(
@@ -293,19 +292,7 @@ def complete_evidence_version_upload(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Evidence version not found",
         ) from error
-
-    except EvidenceUploadNotReadyError as error:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Evidence upload is not ready",
-        ) from error
-
-    except EvidenceUploadVerificationError as error:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Evidence upload verification failed",
-        ) from error
-
+    
     except EvidenceVersionNotPendingError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -314,7 +301,13 @@ def complete_evidence_version_upload(
                 "completed from its current state"
             ),
         ) from error
-
+    
+    except EvidenceUploadNotReadyError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Evidence upload is not ready",
+        ) from error
+    
     except EvidenceStorageError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -322,6 +315,12 @@ def complete_evidence_version_upload(
                 "Evidence storage is temporarily "
                 "unavailable"
             ),
+        ) from error
+    
+    except EvidenceUploadVerificationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Evidence upload verification failed",
         ) from error
 
     except DataIntegrityError as error:

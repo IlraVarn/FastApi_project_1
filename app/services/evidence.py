@@ -139,6 +139,7 @@ def create_evidence_service(
     return db_evidence, db_version
 
 
+#with idempotency
 def create_evidence_version_service(
     *,
     tenant: TenantContext,
@@ -213,7 +214,7 @@ def create_evidence_version_service(
 
     return db_version
 
-
+#for idempotency
 def _replay_evidence_version_create(
     *,
     tenant: TenantContext,
@@ -247,7 +248,7 @@ def _replay_evidence_version_create(
 
     return db_version
 
-
+#for idempotency?
 def _create_new_evidence_version(
     *,
     tenant: TenantContext,
@@ -329,7 +330,7 @@ def _create_new_evidence_version(
 
     return db_version
 
-
+#for URL
 def create_evidence_version_upload_url_service(
     *,
     tenant: TenantContext,
@@ -338,6 +339,19 @@ def create_evidence_version_upload_url_service(
     object_store: S3ObjectStore,
     session: Session,
 ) -> PresignedUpload:
+
+    """Given:
+    - current tenant
+    - evidence_id
+    - evidence_version_id
+
+    prove that this tenant owns that exact EvidenceVersion
+            ↓
+    prove the version is still PENDING
+            ↓
+    ask S3ObjectStore to create temporary PUT permission
+            ↓
+    return that permission to the router to upload the file directly to S3"""
 
     db_version = (
         get_evidence_version_by_id_evidence_and_organization(
@@ -361,16 +375,19 @@ def create_evidence_version_upload_url_service(
     ):
         raise EvidenceVersionNotPendingError()
 
-    checksum_sha256 = db_version.checksum_sha256
+    
+    #S3 infrastructure adapter boundary:
+    # create a temporary PUT permission
+    # allowing the browser to upload the expected bytes
+    # to this exact object key using these required properties
+    # returns PresignedUpload tied to a PUT method
 
-    if checksum_sha256 is None:
-        raise DataIntegrityError()
 
-    try:
+    try: 
         return object_store.create_presigned_upload(
             storage_key=db_version.storage_key,
             content_type=db_version.content_type,
-            checksum_sha256=checksum_sha256,
+            checksum_sha256=db_version.checksum_sha256,
             expires_in_seconds=(
                 EVIDENCE_UPLOAD_URL_TTL_SECONDS
             ),
@@ -392,6 +409,8 @@ def complete_evidence_version_upload_service(
     session: Session,
 ) -> EvidenceVersion:
 
+
+        #get db values recorded BEFORE the upload happened
     try:
         db_version = (
             get_evidence_version_by_id_evidence_and_organization(
@@ -405,11 +424,13 @@ def complete_evidence_version_upload_service(
         if db_version is None:
             raise EvidenceVersionNotFoundError()
 
+
         if (
             db_version.upload_status
             == EvidenceUploadStatusType.AVAILABLE.value
         ):
             return db_version
+        
 
         if (
             db_version.upload_status
@@ -417,6 +438,7 @@ def complete_evidence_version_upload_service(
         ):
             raise EvidenceVersionNotPendingError()
 
+        #copy the values and end the db session
         expected_storage_key = (
             db_version.storage_key
         )
@@ -429,13 +451,15 @@ def complete_evidence_version_upload_service(
             db_version.checksum_sha256
         )
 
-        if expected_checksum_sha256 is None:
-            raise DataIntegrityError()
 
         # End the read transaction before
-        # waiting on the external S3 call.
+        # the external (S3) network operation.
         session.rollback()
 
+
+        #S3 boundary: ask S3 what actually exists
+        #object_store is your S3ObjectMetadata
+        #DO NOT ALLOW THE BROWSER TO SUPPLY THIS
         try:
             metadata = (
                 object_store.get_object_metadata(
@@ -444,39 +468,34 @@ def complete_evidence_version_upload_service(
                     )
                 )
             )
-
+        #no file exists:
         except S3ObjectNotFoundError as error:
-            raise (
-                EvidenceUploadNotReadyError()
-            ) from error
-
+            raise EvidenceUploadNotReadyError() from error 
+        #S3 cannot be reached:
         except S3ObjectStoreError as error:
             raise EvidenceStorageError() from error
 
-        if (
-            metadata.size_bytes
-            != expected_size_bytes
-        ):
-            raise (
-                EvidenceUploadVerificationError()
-            )
 
-        actual_checksum_sha256 = (
-            metadata.checksum_sha256
-        )
+        #compare actual size (can only be an int so we compare right away)
+        if metadata.size_bytes != expected_size_bytes:
+            raise EvidenceUploadVerificationError()
+        
+        #get actual checksum (can be int or None so extract first)
+        actual_checksum_sha256 = metadata.checksum_sha256
 
         if actual_checksum_sha256 is None:
-            raise (
-                EvidenceUploadVerificationError()
-            )
+            raise EvidenceUploadVerificationError()
+    
+        if actual_checksum_sha256 != expected_checksum_sha256:
+            raise EvidenceUploadVerificationError()
 
-        if (
-            actual_checksum_sha256
-            != expected_checksum_sha256
-        ):
-            raise (
-                EvidenceUploadVerificationError()
-            )
+
+        #at this point, still do not mark it AVAILABLE yet.
+        # There is one more concurrency problem to solve.
+        # since last time we contacted s3, another /complete request could have
+        #changed pending -> available. So we can't trust the old db_version anymore
+        #Go back to PostgreSQL, get the CURRENT version of this row, 
+        # and lock it so nobody else can change it while I finish.
 
         locked_version = (
             get_evidence_version_by_id_evidence_and_organization_for_update(
@@ -524,15 +543,9 @@ def complete_evidence_version_upload_service(
         ):
             raise DataIntegrityError()
 
-        locked_checksum_sha256 = (
-            locked_version.checksum_sha256
-        )
-
-        if locked_checksum_sha256 is None:
-            raise DataIntegrityError()
 
         if (
-            locked_checksum_sha256
+            locked_version.checksum_sha256
             != expected_checksum_sha256
         ):
             raise DataIntegrityError()

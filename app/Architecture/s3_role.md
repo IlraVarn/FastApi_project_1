@@ -1,3 +1,89 @@
+                         POST create version
+Browser ─────────────────────────────────────────→ FastAPI
+                                                      │
+                                                      ▼
+                                                PostgreSQL
+                                               EvidenceVersion
+                                                   PENDING
+                                                      │
+                         POST upload-url              │
+Browser ─────────────────────────────────────────→ FastAPI
+                                                      │
+                                                      ▼
+                                                 S3 adapter
+                                                      │
+                                                      ▼
+                                                   AWS S3
+                                                      │
+                     presigned PUT URL                │
+Browser ←─────────────────────────────────────────────┘
+   │
+   │ PUT actual bytes
+   ▼
+AWS S3
+   │
+   │ stores object
+   ▼
+
+Browser ───────────── POST /complete ─────────────→ FastAPI
+                                                      │
+                                                      ▼
+                                                 S3 adapter
+                                                      │
+                                                      ▼
+                                                HeadObject
+                                                      │
+                                      size + SHA-256 metadata
+                                                      │
+                                                      ▼
+                                                   Service
+                                                      │
+                                 expected == actual?
+                                      │               │
+                                     no              yes
+                                      │               │
+                                   reject             ▼
+                                               PostgreSQL
+                                           PENDING → AVAILABLE
+
+
+
+Files belong in S3, not PostgreSQL.
+
+Browser does not receive AWS credentials.
+
+Backend authorizes before issuing presigned access.
+
+Backend chooses the storage key.
+
+Browser uploads bytes directly to S3.
+
+Client's Content-Type is not proof of file type.
+
+Checksum proves byte integrity, not safety.
+
+S3 success does not automatically make evidence AVAILABLE.
+
+Backend independently checks S3.
+
+Only verified object:
+PENDING → AVAILABLE.
+
+S3 adapter owns AWS mechanics.
+
+Service owns business decisions.
+
+Tenant authorization happens in backend,
+not inside S3.
+
+Presigned URLs are temporary, scoped permissions—not AWS credentials.
+
+PostgreSQL and S3 can temporarily disagree.
+
+PENDING is the safe intermediate state until verification succeeds.
+
+
+
 S3 ADAPTER
 (app.infrastructure.s3)
 
@@ -104,3 +190,6 @@ if valid:
 PENDING → AVAILABLE
 ↓
 PostgreSQL commit
+
+
+

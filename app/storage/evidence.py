@@ -137,6 +137,7 @@ def get_evidence_version_by_id_and_evidence(
     return session.exec(statement).first()
 
 
+#used by complete upload service
 def get_evidence_version_by_id_evidence_and_organization(
     *,
     evidence_version_id: int,
@@ -158,6 +159,7 @@ def get_evidence_version_by_id_evidence_and_organization(
     return session.exec(statement).first()
 
 
+#completes the upload pending -> available
 def mark_evidence_version_available_record(
     *,
     db_version: EvidenceVersion,
@@ -173,7 +175,7 @@ def mark_evidence_version_available_record(
 
     session.add(db_version)
 
-
+#gets evidence version and locks it for update
 def get_evidence_version_by_id_evidence_and_organization_for_update(
     *,
     evidence_version_id: int,
