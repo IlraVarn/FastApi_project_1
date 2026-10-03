@@ -7,12 +7,16 @@ from sqlalchemy import inspect
 from typing import Any, cast
 
 
+#ry to insert this row 
+# only if the idempotency key has not already been claimed
+# If this key already exists, don’t create anything.
+# If creation succeeds, give me the new row ID.
 def try_claim_idempotency_record(
     *,
     organization_id: int,
     operation: str,
     idempotency_key: str,
-    request_hash: str,
+    idempotency_request_hash: str,
     session: Session,
 ) -> int | None:
 
@@ -27,7 +31,7 @@ def try_claim_idempotency_record(
             organization_id=organization_id,
             operation=operation,
             idempotency_key=idempotency_key,
-            request_hash=request_hash,
+            request_hash=idempotency_request_hash,
             created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(
@@ -41,6 +45,10 @@ def try_claim_idempotency_record(
     return session.exec(
         statement
     ).scalar_one_or_none()
+
+#Only the same organization + same operation + same idempotency key counts as a duplicate; 
+# the request hash does not decide uniqueness due to
+# unique constraint on organization_id + operation + idempotency_key
 
 
 def get_idempotency_record(
@@ -68,7 +76,8 @@ def get_idempotency_record(
 
 
 
-
+    #the new idempotency record gets linked 
+    # to the actual EvidenceVersion that was just created
 def complete_idempotency_record(
     *,
     idempotency_record_id: int,

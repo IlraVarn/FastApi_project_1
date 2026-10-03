@@ -118,9 +118,9 @@ def create_evidence(
     )
 
 
-#creates EvidenceVersion as pending
-@router.post(
-    "/{evidence_id}/versions",
+
+#creates EvidenceVersion as pending with idempotency
+@router.post("/{evidence_id}/versions",
     response_model=EvidenceVersionPublic,
     status_code=status.HTTP_201_CREATED,
 )
@@ -177,6 +177,8 @@ def create_evidence_version(
     return to_evidence_version_public(
         db_version
     )
+
+
 
 
 #generates the presigned S3 PUT URL
@@ -250,8 +252,6 @@ def create_evidence_version_upload_url(
     return to_evidence_upload_url_public(
         upload
     )
-
-
 
 
 

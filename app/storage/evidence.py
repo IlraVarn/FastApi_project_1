@@ -57,7 +57,7 @@ def add_evidence_version_record(
 
     return db_version
 
-
+#used by  _create_new_evidence_version
 def get_evidence_by_id_and_organization_for_update(
     *,
     evidence_id: int,
@@ -137,7 +137,7 @@ def get_evidence_version_by_id_and_evidence(
     return session.exec(statement).first()
 
 
-#used by complete upload service
+#used by complete upload service and replay
 def get_evidence_version_by_id_evidence_and_organization(
     *,
     evidence_version_id: int,

@@ -151,8 +151,9 @@ def create_evidence_version_service(
     idempotency_key: str,
     session: Session,
 ) -> EvidenceVersion:
-    
-    request_hash = build_idempotency_request_hash(
+
+    #fingerprint the request contents
+    idempotency_request_hash = build_idempotency_request_hash(
         values={
             "user_id": tenant.user_id,
             "evidence_id": evidence_id,
@@ -163,19 +164,19 @@ def create_evidence_version_service(
         },
     )
 
+    #Ask idempotency system: NEW or RETRY?
     try:
         (
-            idempotency_record_id,
-            existing_record,
-        ) = resolve_idempotency_attempt(
+            idempotency_record_id, existing_record
+            ) = resolve_idempotency_attempt(
             organization_id=tenant.organization_id,
             operation=CREATE_EVIDENCE_VERSION_OPERATION,
             idempotency_key=idempotency_key,
-            request_hash=request_hash,
+            idempotency_request_hash=idempotency_request_hash,
             session=session,
         )
 
-        # REPLAY
+        # REPLAY (return the EvidenceVersion created the first time)
         if existing_record is not None:
             return _replay_evidence_version_create(
                 tenant=tenant,
@@ -183,10 +184,11 @@ def create_evidence_version_service(
                 session=session,
             )
 
-        # NEW
+        # defensive check if we get (None, None)
         if idempotency_record_id is None:
             raise DataIntegrityError()
 
+        #genuinely new request, so create the new EvidenceVersion
         db_version = _create_new_evidence_version(
             tenant=tenant,
             evidence_id=evidence_id,
@@ -214,7 +216,11 @@ def create_evidence_version_service(
 
     return db_version
 
-#for idempotency
+
+
+#for idempotency for EvidenceVersion:
+#“This is a retry. Find and return the EvidenceVersion 
+# that the original request already created.”
 def _replay_evidence_version_create(
     *,
     tenant: TenantContext,
@@ -248,7 +254,9 @@ def _replay_evidence_version_create(
 
     return db_version
 
-#for idempotency?
+#helper for idempotency for EvidenceVersion:
+#“This is genuinely a new request. 
+# Create the next EvidenceVersion.”
 def _create_new_evidence_version(
     *,
     tenant: TenantContext,
@@ -314,6 +322,9 @@ def _create_new_evidence_version(
     if db_version.id is None:
         raise DataIntegrityError()
 
+
+    #the new idempotency record gets linked 
+    # to the actual EvidenceVersion that was just created
     result_was_set = (
         complete_idempotency_record(
             idempotency_record_id=(
@@ -324,11 +335,13 @@ def _create_new_evidence_version(
             session=session,
         )
     )
-
+    #if 
     if not result_was_set:
         raise DataIntegrityError()
 
     return db_version
+
+
 
 #for URL
 def create_evidence_version_upload_url_service(

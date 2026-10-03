@@ -104,7 +104,8 @@ class EvidenceVersion(SQLModel, table=True):
 
     version_number: int = Field(nullable=False)
 
-    #proves where the file is. An object inside S3 bucket
+    #proves where the file is. 
+    # An object inside S3 bucket. Backend builds it.
     storage_key: str = Field(nullable=False)
 
     original_filename: str = Field(nullable=False)
