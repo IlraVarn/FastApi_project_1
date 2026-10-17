@@ -133,6 +133,7 @@ def create_evidence_version(
         alias="Idempotency-Key",
         min_length=1,
         max_length=128,
+        pattern=r".*\S.*",
     ),
     session: Session = Depends(get_session),
     

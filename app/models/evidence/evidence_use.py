@@ -23,3 +23,16 @@ class EvidenceUse(SQLModel, table=True):
         index=True,
     )
 
+    created_by_user_id: int = Field(
+        foreign_key="users.id",
+        nullable=False,
+    )
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+            ),
+    )
+    

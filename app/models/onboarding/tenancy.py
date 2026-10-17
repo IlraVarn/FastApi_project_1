@@ -13,7 +13,7 @@ class Organization(SQLModel, table=True):
         )
     
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(nullable=False)
+    organization_name: str = Field(nullable=False)
 
 
 class Membership(SQLModel, table=True):

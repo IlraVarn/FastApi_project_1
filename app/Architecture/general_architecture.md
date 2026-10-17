@@ -1,6 +1,8 @@
 
 
 
+
+
 User
   │
   ▼
@@ -21,10 +23,15 @@ Organization
                                │              │
                                │              └────────► EvidenceUse
                                │                           │
-                               │                           └────────►EvidenceVersion
+                               │                           └────────► EvidenceVersion
+                               │
+                               ├────────► GateSubmission
+                               │              │
+                               │              └────────► GateSubmissionEvidence
+                               │                           ├────────► GateRequirement
+                               │                           └────────► EvidenceVersion
                                │
                                └────────► GateStateTransition
-
 
 User
   │
@@ -59,6 +66,55 @@ Organization
                                          │ evidence_version_id
                                          │
                                     EvidenceUse
+
+
+
+User
+  │
+  │ user_id
+  ▼
+Membership
+  ▲
+  │ organization_id
+  │
+Organization
+  │
+  ├──────── organization_id ────────► Evidence
+  │                                      │
+  │                                      │ evidence_id
+  │                                      ▼
+  │                                EvidenceVersion
+  │                                      ▲
+  │                                      │ evidence_version_id
+  │                                      │
+  │                                 EvidenceUse
+  │      
+  │                               
+  └──────── organization_id ────────► WorkflowRecord
+                                         │
+                                         │ workflow_record_id
+                                         ▼
+                                       Gate
+                                         │
+                                         ├── gate_id ──► GateRequirement
+                                         │                  │
+                                         │                  │ gate_requirement_id
+                                         │                  ▼
+                                         │              EvidenceUse
+                                         │
+                                         ├── gate_id ──► GateSubmission
+                                         │                  │
+                                         │                  │ gate_submission_id
+                                         │                  ▼
+                                         │         GateSubmissionEvidence
+                                         │                  │
+                                         │                  ├── gate_requirement_id
+                                         │                  │       └────► GateRequirement
+                                         │                  │
+                                         │                  └── evidence_version_id
+                                         │                          └────► EvidenceVersion
+                                         │
+                                         └── gate_id ──► GateStateTransition
 
 *One EvidenceVersion can have multiple EvidenceUse records, allowing it to support requirements in several gates.
 

@@ -14,7 +14,7 @@ from app.enums import GateStatusType
 from app.storage.gate_transitions import add_gate_state_transition_record
 from app.storage.gates import (
     get_active_gate_by_id,
-    update_gate_status_record,
+    change_gate_status,
 )
 from app.tenancy.context import TenantContext
 
@@ -74,7 +74,7 @@ def transition_gate_state_service(
         raise DataIntegrityError()
 
     try:
-        update_gate_status_record(
+        change_gate_status(
             db_gate=db_gate,
             new_status=new_status.value,
             changed_at=changed_at,

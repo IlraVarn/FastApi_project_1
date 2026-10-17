@@ -1,6 +1,6 @@
 
 from app.tenancy.context import TenantContext
-from app.models.evidence import Evidence, EvidenceVersion
+from app.models.evidence.evidence import Evidence, EvidenceVersion
 from app.models import IdempotencyRecord
 from sqlmodel import Session
 from app.storage.gates import get_active_gate_by_id
@@ -43,7 +43,7 @@ from app.storage.idempotency import (
 )
 
 from sqlalchemy.exc import IntegrityError
-from app.models.evidence import EvidenceVersion, Evidence
+from app.models.evidence.evidence import EvidenceVersion, Evidence
 from uuid import uuid4
 from app.enums import EvidenceUploadStatusType
 from datetime import datetime, UTC

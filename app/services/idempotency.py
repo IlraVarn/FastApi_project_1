@@ -7,7 +7,7 @@ from app.errors import (
     DataIntegrityError,
     IdempotencyConflictError,
 )
-from app.models.idempotency import IdempotencyRecord
+from app.models.idempotency.idempotency import IdempotencyRecord
 from app.storage.idempotency import (
     get_idempotency_record,
     try_claim_idempotency_record,

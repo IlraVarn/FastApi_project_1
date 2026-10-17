@@ -81,8 +81,8 @@ def get_gate_by_id_include_archived(
 
     return session.exec(statement).first()
 
-
-def update_gate_status_record(
+#former update_gate_status_record
+def change_gate_status(
     *,
     db_gate: Gate,
     new_status: str,

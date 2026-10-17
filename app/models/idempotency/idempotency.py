@@ -29,8 +29,8 @@ class IdempotencyRecord(SQLModel, table=True):
             name="ck_idempotency_key_non_empty",
         ),
         CheckConstraint(
-            "length(request_hash) = 64",
-            name="ck_idempotency_request_hash_length",
+            "idempotency_request_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_idempotency_request_hash_hex",
         ),
     )
 

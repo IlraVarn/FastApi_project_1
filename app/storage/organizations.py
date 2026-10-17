@@ -9,7 +9,7 @@ def add_organization_record(
     session: Session,
 ) -> Organization:
     db_organization = Organization(
-        name=organization_name,
+        organization_name=organization_name,
     )
 
     session.add(db_organization)

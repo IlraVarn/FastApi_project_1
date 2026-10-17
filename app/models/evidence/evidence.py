@@ -101,7 +101,7 @@ class EvidenceVersion(SQLModel, table=True):
         foreign_key="evidence.id",
         nullable=False,
     )
-
+    #historical version of evidence
     version_number: int = Field(nullable=False)
 
     #proves where the file is. 
