@@ -9,7 +9,7 @@ from enum import Enum
 class Organization(SQLModel, table=True):
     __tablename__: ClassVar[str] = "organizations"
     __table_args__ = (
-        CheckConstraint("length(trim(name)) > 0", name="ck_organization_name_non_empty"),
+        CheckConstraint("length(trim(organization_name)) > 0", name="ck_organization_name_non_empty"),
         )
     
     id: int | None = Field(default=None, primary_key=True)

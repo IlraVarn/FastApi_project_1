@@ -24,6 +24,12 @@ from app.schemas.evidence import (
     EvidenceUploadUrlPublic,
     EvidenceUploadStatusType
 )
+
+from app.schemas.workflow_record import (
+    WorkflowRecordPublic,
+    WorkflowRecordCreateRequest,
+)
+
 # from app.schemas.evidence_use import (
 #     EvidenceUseCreate,
 #     EvidenceUsePublic,

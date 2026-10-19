@@ -45,6 +45,11 @@ class GateStateTransition(SQLModel, table=True):
         nullable=True,
     )
 
+    authorization_role: str | None = Field(
+        default=None,
+        nullable=True,
+    )
+
     occurred_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
@@ -52,3 +57,4 @@ class GateStateTransition(SQLModel, table=True):
             nullable=False,
         ),
     )
+

@@ -42,6 +42,7 @@ def transition_gate_state_service(
     reason: str | None,
     session: Session,
 ) -> Gate:
+    
     db_gate = get_active_gate_by_id(
         gate_id=gate_id,
         organization_id=tenant.organization_id,

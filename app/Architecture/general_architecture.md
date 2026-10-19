@@ -33,39 +33,6 @@ Organization
                                │
                                └────────► GateStateTransition
 
-User
-  │
-  │ user_id
-  ▼
-Membership
-  ▲
-  │ organization_id
-  │
-Organization
-  │
-  ├──────── organization_id ────────► WorkflowRecord
-  │                                      │
-  │                                      │ workflow_record_id
-  │                                      ▼
-  │                                    Gate
-  │                                      │
-  │                                      ├── gate_id ──► GateRequirement
-  │                                      │                  │
-  │                                      │                  │ gate_requirement_id
-  │                                      │                  ▼
-  │                                      │              EvidenceUse
-  │                                      │                  │
-  │                                      └── gate_id ──► GateStateTransition
-  │
-  └──────── organization_id ────────► Evidence
-                                         │
-                                         │ evidence_id
-                                         ▼
-                                   EvidenceVersion
-                                         ▲
-                                         │ evidence_version_id
-                                         │
-                                    EvidenceUse
 
 
 
@@ -88,8 +55,7 @@ Organization
   │                                      │ evidence_version_id
   │                                      │
   │                                 EvidenceUse
-  │      
-  │                               
+  │
   └──────── organization_id ────────► WorkflowRecord
                                          │
                                          │ workflow_record_id

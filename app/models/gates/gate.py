@@ -3,7 +3,13 @@ from sqlmodel import Field, SQLModel, Relationship
 from pydantic import field_validator, EmailStr, ConfigDict
 from datetime import datetime, UTC
 from typing import Literal, ClassVar
-from sqlalchemy import CheckConstraint, UniqueConstraint, Column, DateTime
+from sqlalchemy import (
+    CheckConstraint, 
+    UniqueConstraint, 
+    Column, 
+    DateTime,
+    ForeignKeyConstraint,
+)
 from enum import Enum
 from app.enums import GateType, GateStatusType
 
@@ -24,14 +30,28 @@ class Gate(SQLModel, table=True):
             """,
             name="ck_gate_type_valid",
         ),
+        ForeignKeyConstraint(
+            ["workflow_record_id", "organization_id"],
+            [
+                "workflow_records.id",
+                "workflow_records.organization_id",
+            ],
+            name="fk_gate_workflow_record_organization",
+        ),
     )
+
     
     id: int | None = Field(default=None, primary_key=True)    
 
     organization_id: int = Field(
         nullable=False, 
-        foreign_key='organizations.id',
         index=True)
+
+    
+    workflow_record_id: int = Field(
+        nullable=False,
+        index=True,
+    )
 
     gate_type: str = Field(nullable=False)
 
