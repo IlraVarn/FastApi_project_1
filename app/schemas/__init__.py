@@ -30,6 +30,11 @@ from app.schemas.workflow_record import (
     WorkflowRecordCreateRequest,
 )
 
+from app.schemas.gate_submission import (
+    GateSubmissionCreateRequest,
+    GateSubmissionPublic
+)
+
 # from app.schemas.evidence_use import (
 #     EvidenceUseCreate,
 #     EvidenceUsePublic,

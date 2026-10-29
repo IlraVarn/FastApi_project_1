@@ -37,10 +37,6 @@ from app.services.gates import (
     archive_gate_service,
     )
 
-from app.services.gate_transitions import (
-    transition_gate_state_service,
-    )
-
 from app.errors import (
     ConflictError, 
     GateNotFoundError, 
@@ -50,6 +46,8 @@ from app.errors import (
     InvalidGateStateTransitionError,
     RejectionReasonRequiredError,
     GateArchiveNotAllowedError,
+    WorkflowRecordNotFoundError,
+    StaleGateError
     )
 
 from app.mappers.gate_mappers import (
@@ -68,7 +66,7 @@ from app.mappers.gate_mappers import (
 # )
 
 
-router = APIRouter(prefix="/organizations/{organization_id}/gates", 
+router = APIRouter(prefix="/organizations/{organization_id}/workflow-records/{workflow_record_id}/gates", 
                    tags=["gates"])
 
 
@@ -79,6 +77,7 @@ router = APIRouter(prefix="/organizations/{organization_id}/gates",
 )
 def create_gate(
     gate: GateCreateRequest,
+    workflow_record_id: int,
     tenant: TenantContext =
         Depends(get_tenant_context),
     session: Session=
@@ -89,6 +88,7 @@ def create_gate(
     try:
         db_gate, db_requirements = create_gate_with_requirements_service(
             gate_type=gate.gate_type,
+            workflow_record_id=workflow_record_id,
             requirement_types=gate.requirement_types,
             tenant=tenant,
             session=session,
@@ -99,61 +99,21 @@ def create_gate(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Gate could not be created") from error
 
-    return to_gate_with_requirements_public(db_gate, db_requirements)
-
-
-
-@router.post(
-    "/{gate_id}/state-transitions",
-    response_model=GatePublic,
-)
-def transition_gate_state(
-    gate_id: int,
-    transition: GateStateTransitionRequest,
-    tenant: TenantContext = Depends(get_tenant_context),
-    session: Session = Depends(get_session),
-):
-    try:
-        db_gate = transition_gate_state_service(
-            tenant=tenant,
-            gate_id=gate_id,
-            new_status=transition.target_status,
-            reason=transition.reason,
-            session=session,
-        )
-
-    except GateNotFoundError as error:
+    except WorkflowRecordNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error.detail,
         ) from error
 
-    except InvalidGateStateTransitionError as error:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Gate state transition is not allowed",
-        ) from error
-
-    except DataIntegrityError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gate state transition could not be completed") from error
-
-    except RejectionReasonRequiredError as error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Rejection reason required",
-        ) from error
-
-    return to_gate_public(db_gate)
+    return to_gate_with_requirements_public(db_gate, db_requirements)
 
 
-#GET AND LIST
 @router.get("/{gate_id}", 
             response_model=GateWithRequirementsPublic
             )
 def get_gate_with_requirements(
     gate_id: int = Path(gt=0),
+    workflow_record_id: int = Path(gt=0),
     tenant: TenantContext = 
         Depends(get_tenant_context),
     session: Session = 
@@ -163,6 +123,7 @@ def get_gate_with_requirements(
     try:
         db_gate, db_requirements = get_gate_with_requirements_service(
             gate_id=gate_id,
+            workflow_record_id=workflow_record_id,
             tenant=tenant,
             session=session,
         )
@@ -182,6 +143,7 @@ def get_gate_with_requirements(
             response_model=GateListPublicWithCount)
 def list_gates_with_count(
     gate_type: GateType | None = None,
+    workflow_record_id: int = Path(gt=0),
     status: GateStatusType | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -194,6 +156,7 @@ def list_gates_with_count(
     
     db_gates, db_gates_count = list_active_gates_with_count_service(
         gate_type=gate_type,
+        workflow_record_id=workflow_record_id,
         status=status,
         offset=offset,
         limit=limit,
@@ -214,8 +177,9 @@ def list_gates_with_count(
     "/{gate_id}",
     response_model=GatePublic,
 )
-def patch_gate(
-    gate_id: int,
+def patch_gate(*,
+    gate_id: int = Path(gt=0),
+    workflow_record_id: int = Path(gt=0),
     gate_update: GatePatchRequest,
     tenant: TenantContext = Depends(get_tenant_context),
     session: Session = Depends(get_session),
@@ -225,11 +189,14 @@ def patch_gate(
     #convert request model into a dict
     update_data = gate_update.model_dump(
             exclude_unset=True,
+            exclude={"expected_row_version"},
         )
     
     try:
         db_gate = update_gate_patch_service(
             gate_id=gate_id,
+            workflow_record_id=workflow_record_id,
+            expected_row_version=gate_update.expected_row_version,
             tenant=tenant,
             update_data=update_data,
             session=session,
@@ -246,6 +213,12 @@ def patch_gate(
             status_code=400,
             detail=error.detail,
         ) from error
+    
+    except StaleGateError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Gate has changed since it was loaded",
+        ) from error
 
     except DataIntegrityError as error:
         raise HTTPException(
@@ -261,9 +234,11 @@ def patch_gate(
 
 #DELETE
 
-@router.delete("/{gate_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{gate_id}/row_version/{expected_row_version}", status_code=status.HTTP_204_NO_CONTENT)
 def archive_gate(
-    gate_id: int,
+    gate_id: int = Path(gt=0),
+    workflow_record_id: int = Path(gt=0),
+    expected_row_version: int = Path(gt=0),
     tenant: TenantContext =
             Depends(get_tenant_context),
     session: Session = Depends(get_session),
@@ -273,6 +248,8 @@ def archive_gate(
     try:
         archive_gate_service(
             gate_id=gate_id,
+            workflow_record_id=workflow_record_id,
+            expected_row_version=expected_row_version,
             tenant=tenant,
             session=session,
         )
@@ -293,6 +270,12 @@ def archive_gate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="internal server error",
+        ) from error
+
+    except StaleGateError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Gate has changed since it was loaded",
         ) from error
 
     return Response(

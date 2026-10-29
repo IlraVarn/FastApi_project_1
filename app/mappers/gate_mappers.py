@@ -3,29 +3,28 @@
 from app.models import (
     Gate, 
     GateRequirement,
-    Organization,
     )
 
 from app.schemas import (
     GatePublic,
     GateWithRequirementsPublic,
-    OrganizationPublic,
-    GateRequirementPublic,
     GateListPublicWithCount
+
 )
 
 from app.enums import (
     GateStatusType, 
-    GateRequirementType,
     GateType,
-    EvidenceUploadStatusType)
+    )
 
 from sqlmodel import col
 from app.mappers.requirements_mappers import to_requirement_public
 from app.errors import DataIntegrityError
 
 
-def to_gate_public(db_gate: Gate)-> GatePublic:
+def to_gate_public(
+        db_gate: Gate
+        )-> GatePublic:
 
     if db_gate.id is None:
         raise DataIntegrityError()
@@ -33,13 +32,15 @@ def to_gate_public(db_gate: Gate)-> GatePublic:
     return GatePublic(
         id=db_gate.id,
         organization_id=db_gate.organization_id,
+        created_by_user_id=db_gate.created_by_user_id,
         gate_type=GateType(db_gate.gate_type),
         status=GateStatusType(db_gate.status),
         created_at=db_gate.created_at,
         updated_at=db_gate.updated_at,
         archived_at=db_gate.archived_at,
-        reference=db_gate.reference
-    )
+        reference=db_gate.reference,
+        row_version=db_gate.row_version)
+    
 
 
 def to_gate_public_list(db_gates: list[Gate]
@@ -71,12 +72,14 @@ def to_gate_with_requirements_public(
     return GateWithRequirementsPublic(
         id=db_gate.id,
         organization_id=db_gate.organization_id,
+        created_by_user_id=db_gate.created_by_user_id,
         gate_type=GateType(db_gate.gate_type),
         status=GateStatusType(db_gate.status),
         created_at=db_gate.created_at,
         updated_at=db_gate.updated_at,
         archived_at=db_gate.archived_at,
         reference=db_gate.reference,
+        row_version=db_gate.row_version,
         requirements=public_requirements
     )
 

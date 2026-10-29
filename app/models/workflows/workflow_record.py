@@ -35,7 +35,7 @@ class WorkflowRecord(SQLModel, table=True):
         index=True,
     )
 
-    reference: str = Field(
+    name: str = Field(
         nullable=False,
     )
 

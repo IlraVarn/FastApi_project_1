@@ -15,6 +15,9 @@ class DuplicateCustomerEmailError(AppError):
     default_detail = "customer email already exists"
 
 
+class WorkflowRecordNotFoundError(AppError):
+    default_detail = "workflow record not found"
+
 class GateNotFoundError(AppError):
     default_detail = "gate not found"
 
@@ -39,9 +42,13 @@ class UserNotFoundError(AppError):
 class TenantAccessDeniedError(Exception):
     pass
 
+
+class StaleGateError(AppError):
+    default_detail = "gate has changed since it was loaded"
+
+
 class RejectionReasonRequiredError(AppError):
     default_detail = "rejection reason required"
-
 
 class GateArchiveNotAllowedError(AppError):
     default_detail = "draft gate cannot be archived"

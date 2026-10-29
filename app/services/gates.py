@@ -8,6 +8,8 @@ from app.errors import ( GateNotFoundError,
                     InvalidGateStateTransitionError,
                     InvalidGateUpdateError,
                     GateArchiveNotAllowedError,
+                    WorkflowRecordNotFoundError,
+                    StaleGateError
                     )
 from app.models import (
     Gate, 
@@ -23,12 +25,14 @@ from app.storage.gates import (
                     list_active_gates,
                     count_active_gates_by_filter,
                     update_gate_patch,
-                    get_gate_by_id_include_archived,
-                    archive_gate_record
+                    get_gate_by_id_include_archived_for_update,
+                    archive_gate_record,
+                    get_active_gate_by_id_for_update
                             )
 
 from app.storage.requirements import (add_gate_requirement_record,
                            list_requirements_by_gate_id,)
+from app.storage.workflow_record import get_active_workflow_record_by_id
 
 
 
@@ -37,13 +41,28 @@ def create_gate_with_requirements_service(
     *,
     tenant: TenantContext,
     gate_type: GateType,
+    workflow_record_id: int,
     requirement_types: list[GateRequirementType],
     session: Session,
 ) -> tuple[Gate, list[GateRequirement]]:
 
+    # The URL value is untrusted input for workflow_record_id
+    # Before add_gate_record(), verify:
+
+    db_workflow_record = get_active_workflow_record_by_id(
+        workflow_record_id=workflow_record_id,
+        organization_id=tenant.organization_id,
+        session=session,
+    )
+
+    if db_workflow_record is None:
+        raise WorkflowRecordNotFoundError()
+
     try:
         db_gate = add_gate_record(
             organization_id=tenant.organization_id,
+            workflow_record_id=workflow_record_id,
+            created_by_user_id=tenant.user_id,
             gate_type=gate_type,
             status=GateStatusType.DRAFT,
             session=session,
@@ -87,13 +106,15 @@ def create_gate_with_requirements_service(
 
 
 def get_gate_with_requirements_service(*,
-    tenant: TenantContext,                                   
+    tenant: TenantContext,         
+    workflow_record_id: int,                          
     gate_id: int,
     session: Session,
 ) -> tuple[Gate, list[GateRequirement]]:
 
     db_gate = get_active_gate_by_id(
         gate_id=gate_id, 
+        workflow_record_id=workflow_record_id,
         organization_id=tenant.organization_id,
         session=session)
 
@@ -108,7 +129,8 @@ def get_gate_with_requirements_service(*,
 
 def list_active_gates_with_count_service(
         *,
-        session: Session,               
+        session: Session,      
+        workflow_record_id: int,    
         gate_type: GateType | None,
         status: GateStatusType | None,
         sort_by: GateSortBy,
@@ -117,9 +139,21 @@ def list_active_gates_with_count_service(
         limit: int,
         tenant: TenantContext
 ) -> tuple[list[Gate], int]:
+
+    #check for workflow_record to differentiate betw no wfr vs no gates
+    db_workflow_record = get_active_workflow_record_by_id(
+        workflow_record_id=workflow_record_id,
+        organization_id=tenant.organization_id,
+        session=session,
+    )
+
+    if db_workflow_record is None:
+        raise WorkflowRecordNotFoundError()
+
     
     db_gates = list_active_gates(
         gate_type=gate_type,
+        workflow_record_id=workflow_record_id,
         session=session,               
         status=status,
         sort_by=sort_by,
@@ -131,6 +165,7 @@ def list_active_gates_with_count_service(
 
     db_gates_count = count_active_gates_by_filter(
             gate_type=gate_type,
+            workflow_record_id=workflow_record_id,
             session=session,               
             status=status,
             organization_id=tenant.organization_id
@@ -143,10 +178,13 @@ def update_gate_patch_service(
     *,
     gate_id: int,
     tenant: TenantContext,
+    workflow_record_id: int,
+    expected_row_version: int,
     update_data: dict[str, Any],
     session: Session,
 ) -> Gate:
-    """Partially update an existing gate and commit the valid result.
+    """Partially update an existing gate if the client edited the current version
+      and commit the valid result.
 
     Only fields supplied by the client are changed.
 
@@ -155,22 +193,28 @@ def update_gate_patch_service(
         InvalidGateUpdateError: The request is empty or supplies null.
         DataIntegrityError: Stored relationships or database writes fail.
     """
-
-    db_gate = get_active_gate_by_id(
-        gate_id=gate_id, 
-        organization_id=tenant.organization_id,
-        session=session)
-
-    if db_gate is None:
-        raise GateNotFoundError()
-
     #working with the dict
+    #checks that do not require the Gate before acquiring the lock
     if not update_data:
         raise InvalidGateUpdateError()
 
     for value in update_data.values():
         if value is None:   
             raise InvalidGateUpdateError()
+
+        
+    db_gate = get_active_gate_by_id_for_update(
+            gate_id=gate_id,
+            workflow_record_id=workflow_record_id,
+            organization_id=tenant.organization_id,
+            session=session,
+        )
+    
+    if db_gate is None:
+        raise GateNotFoundError()
+    
+    if db_gate.row_version != expected_row_version:
+        raise StaleGateError()
 
     try:
         update_gate_patch(
@@ -197,6 +241,8 @@ def update_gate_patch_service(
 def archive_gate_service(
     *,
     gate_id: int,
+    workflow_record_id: int,
+    expected_row_version: int,
     tenant: TenantContext,
     session: Session,
 ) -> None:
@@ -210,23 +256,29 @@ def archive_gate_service(
         within the organization.
         DataIntegrityError: The database write fails.
     """
-
-    db_gate = get_gate_by_id_include_archived(
-        gate_id=gate_id,
-        organization_id=tenant.organization_id,
-        session=session,
-    )
-
-    if db_gate is None:
-        raise GateNotFoundError()
-
-    if db_gate.archived_at is not None:
-        return 
-    
-    if db_gate.status == 'draft':
-        raise GateArchiveNotAllowedError()
-    
     try:
+
+        db_gate = get_gate_by_id_include_archived_for_update(
+            gate_id=gate_id,
+            workflow_record_id=workflow_record_id,
+            organization_id=tenant.organization_id,
+            session=session,
+        )
+
+        if db_gate is None:
+            raise GateNotFoundError()
+
+        if db_gate.archived_at is not None:
+            session.rollback()
+            return 
+        
+        if db_gate.status == 'draft':
+            raise GateArchiveNotAllowedError()
+        
+        if db_gate.row_version != expected_row_version:
+            raise StaleGateError()
+
+    
         archive_gate_record(
             db_gate=db_gate,
             session=session,

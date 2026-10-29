@@ -1,17 +1,17 @@
 from __future__ import annotations
-from sqlmodel import Field, SQLModel, Relationship
-from pydantic import field_validator, EmailStr, ConfigDict
+from sqlmodel import Field, SQLModel
 from datetime import datetime, UTC
-from typing import Literal, ClassVar
+from typing import  ClassVar, Any, cast
 from sqlalchemy import (
     CheckConstraint, 
     UniqueConstraint, 
     Column, 
     DateTime,
     ForeignKeyConstraint,
+    Table
 )
-from enum import Enum
-from app.enums import GateType, GateStatusType
+from app.enums import GateStatusType
+from sqlalchemy.orm import declared_attr
 
 
 
@@ -40,18 +40,24 @@ class Gate(SQLModel, table=True):
         ),
     )
 
+
     
     id: int | None = Field(default=None, primary_key=True)    
 
     organization_id: int = Field(
         nullable=False, 
         index=True)
-
     
     workflow_record_id: int = Field(
         nullable=False,
         index=True,
     )
+
+    created_by_user_id: int = Field(
+    foreign_key="users.id",
+    nullable=False,
+    index=True,
+)
 
     gate_type: str = Field(nullable=False)
 
@@ -80,6 +86,10 @@ class Gate(SQLModel, table=True):
     )
     reference: str | None = Field(default=None, nullable=True)
 
+    row_version: int = Field(
+        default=1,
+        nullable=False,
+    )
 
 class GateRequirement(SQLModel, table=True):
     __tablename__: ClassVar[str] = "gate_requirements"

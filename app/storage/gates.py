@@ -3,7 +3,7 @@ from sqlalchemy import asc, desc, func
 from datetime import UTC, datetime
 from app.models import (
     Gate, 
-    GateStateTransition
+    GateStatusChange
     )
 
 from app.enums import GateStatusType, GateType
@@ -24,6 +24,8 @@ def add_gate_record(
     *,
     organization_id: int,
     gate_type: GateType,
+    created_by_user_id: int,
+    workflow_record_id: int,
     status: GateStatusType,
     session: Session,
 ) -> Gate:
@@ -34,6 +36,8 @@ def add_gate_record(
     """
     db_gate = Gate(
         organization_id=organization_id,
+        created_by_user_id=created_by_user_id,
+        workflow_record_id=workflow_record_id,
         gate_type=gate_type.value,
         status=status.value,
     )
@@ -46,6 +50,7 @@ def add_gate_record(
 def get_active_gate_by_id(
     *,
     gate_id: int,
+    workflow_record_id: int,
     organization_id: int,
     session: Session,
 ) -> Gate | None:
@@ -57,15 +62,39 @@ def get_active_gate_by_id(
         .where(
         col(Gate.id) == gate_id,
             Gate.organization_id == organization_id,
+            Gate.workflow_record_id == workflow_record_id,
             col(Gate.archived_at).is_(None),
         ))
 
     return session.exec(statement).first()
 
 
-def get_gate_by_id_include_archived(
+def get_active_gate_by_id_for_update(
     *,
     gate_id: int,
+    workflow_record_id: int,
+    organization_id: int,
+    session: Session,
+) -> Gate | None:
+
+    statement = (
+        select(Gate)
+        .where(
+            col(Gate.id) == gate_id,
+            Gate.organization_id == organization_id,
+            Gate.workflow_record_id == workflow_record_id,
+            col(Gate.archived_at).is_(None),
+        )
+        .with_for_update()
+    )
+
+    return session.exec(statement).first()
+
+
+def get_gate_by_id_include_archived_for_update(
+    *,
+    gate_id: int,
+    workflow_record_id: int,
     organization_id: int,
     session: Session,
 ) -> Gate | None:
@@ -76,31 +105,19 @@ def get_gate_by_id_include_archived(
         select(Gate)
         .where(
         col(Gate.id) == gate_id,
-        col(Gate.organization_id == organization_id,
-        )))
+            Gate.organization_id == organization_id,
+            Gate.workflow_record_id == workflow_record_id,
+            )
+            .with_for_update()
+            )
 
     return session.exec(statement).first()
-
-#former update_gate_status_record
-def change_gate_status(
-    *,
-    db_gate: Gate,
-    new_status: str,
-    changed_at: datetime,
-    session: Session,
-) -> Gate:
-    
-    db_gate.status = new_status
-    db_gate.updated_at = changed_at
-
-    session.add(db_gate)
-
-    return db_gate
 
 
 def list_active_gates(
         *,
         session: Session,    
+        workflow_record_id: int,
         gate_type: GateType | None,          
         status: GateStatusType | None,
         sort_by: GateSortBy,
@@ -115,6 +132,7 @@ def list_active_gates(
     statement = (select(Gate)
         .where(
             Gate.organization_id == organization_id,
+            Gate.workflow_record_id == workflow_record_id,
             col(Gate.archived_at).is_(None)))
 
     if status is not None:
@@ -123,7 +141,7 @@ def list_active_gates(
 
     if gate_type is not None:
         statement = statement.where(
-            Gate.gate_type == gate_type.value)
+            col(Gate.gate_type == gate_type.value))
 
     sort_column = GATE_SORT_COLUMNS[sort_by]
 
@@ -151,6 +169,7 @@ def list_active_gates(
 def count_active_gates_by_filter(
         *,
         session: Session,    
+        workflow_record_id: int,
         gate_type: GateType | None,          
         status: GateStatusType | None,
         organization_id: int
@@ -163,6 +182,7 @@ def count_active_gates_by_filter(
         )
          .where(
             Gate.organization_id == organization_id,
+            Gate.workflow_record_id == workflow_record_id,
             col(Gate.archived_at).is_(None)))
 
     if status is not None:
@@ -171,7 +191,7 @@ def count_active_gates_by_filter(
 
     if gate_type is not None:
         statement = statement.where(
-            Gate.gate_type == gate_type.value)
+            col(Gate.gate_type == gate_type.value))
 
     total_count = session.exec(statement).one()
 
@@ -192,7 +212,11 @@ def update_gate_patch(
     """
 
     db_gate.sqlmodel_update(update_data)
+
+    db_gate.row_version += 1
+
     db_gate.updated_at= datetime.now(UTC)
+
     session.add(db_gate)
 
     return db_gate
@@ -212,6 +236,9 @@ def archive_gate_record(
     now = datetime.now(UTC)
 
     db_gate.archived_at = now
+
+    db_gate.row_version += 1
+
     db_gate.updated_at = now
 
     session.add(db_gate)

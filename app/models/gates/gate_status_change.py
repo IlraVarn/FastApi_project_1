@@ -10,7 +10,7 @@ from app.enums import GateType, GateStatusType
 
 
 
-class GateStateTransition(SQLModel, table=True):
+class GateStatusChange(SQLModel, table=True):
     __tablename__: ClassVar[str] = "gate_state_transitions"
 
     id: int | None = Field(

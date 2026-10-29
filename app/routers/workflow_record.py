@@ -21,13 +21,8 @@ from app.schemas import (
 
 
 
-from app.services.gates import (
-    create_gate_with_requirements_service,
-    get_gate_with_requirements_service,
-    list_active_gates_with_count_service,
-    count_active_gates_by_filter,
-    update_gate_patch_service,
-    archive_gate_service,
+from app.services.workflow_record import (
+    create_workflow_record_service
     )
 
 from app.services.gate_transitions import (
@@ -38,9 +33,8 @@ from app.errors import (
     DataIntegrityError,
     )
 
-from app.mappers.gate_mappers import (
-    to_gate_with_requirements_public,
-    to_gate_public,
+from app.mappers.workflow_record_mappers import (
+    to_workflow_record_public
     )
 
 
@@ -73,7 +67,7 @@ def create_workflow_record(
 
     try:
         db_workflow_record = create_workflow_record_service(
-            reference=workflow_record.reference,
+            name=workflow_record.name,
             tenant=tenant,
             session=session,
         )

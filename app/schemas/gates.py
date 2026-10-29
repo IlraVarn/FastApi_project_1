@@ -21,7 +21,7 @@ class GatePatchRequest(SQLModel):
     #rejects fields the client cannot mutate
     model_config = ConfigDict(extra='forbid') #type: ignore[assignment]
     reference: str | None = Field(default=None, min_length=1)
-
+    expected_row_version: int = Field(gt=0)
 
 class GateRequirementPublic(SQLModel):
     id: int
@@ -32,12 +32,14 @@ class GateRequirementPublic(SQLModel):
 class GatePublic(SQLModel):
     id: int
     organization_id: int
+    created_by_user_id: int
     gate_type: str
     status: GateStatusType
     created_at: datetime
     updated_at: datetime
     archived_at: datetime | None
     reference: str | None
+    row_version: int
 
 
 class GateListPublicWithCount(SQLModel):
